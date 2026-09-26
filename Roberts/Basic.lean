@@ -1,3 +1,2 @@
--- Roberts theorem: core definitions live here.
-import Roberts.Defs
-import Roberts.Taxation
+-- Roberts theorem: full development, culminating in Roberts.roberts_theorem.
+import Roberts.Induction

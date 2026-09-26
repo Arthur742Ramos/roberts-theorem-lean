@@ -50,12 +50,6 @@ def IsAffineMaximizer {N A : Type*} [Fintype N] [Fintype A]
       (∃ i, weights i ≠ 0) ∧
         ∀ v a, affineScore weights k v (f v) ≥ affineScore weights k v a
 
--- M6 target theorem: proof deferred to a later milestone.
-theorem roberts_theorem {N A : Type*} [Fintype N] [Nonempty N]
-    [Fintype A] [Nonempty A] (hA : 3 ≤ Fintype.card A)
-    (M : Mechanism N A) (hdsic : IsDSIC M)
-    (honto : Function.Surjective M.choiceFn) :
-    IsAffineMaximizer M.choiceFn := by
-  sorry
+-- M6 target theorem: proved in Roberts.Induction (moved there to avoid a circular import).
 
 end Roberts
