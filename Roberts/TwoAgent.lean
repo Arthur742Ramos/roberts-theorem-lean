@@ -1,6 +1,9 @@
 import Roberts.NoVeto
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Tactic.Ring
+import Mathlib.Tactic.LinearCombination
+import Mathlib.Algebra.Order.Archimedean.Basic
+import Mathlib.Algebra.Order.Archimedean.Real.Basic
 
 namespace Roberts
 
@@ -344,6 +347,162 @@ lemma incr_const {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choice
     _ = normPrice M i2 c0 (bumpVal i1 (fun _ _ => 0) a δ) a -
           normPrice M i2 c0 (fun _ _ => 0) a :=
         (incr_eq hdsic hsmon h12 hall hdec c0 (fun _ _ => 0) a b ha hbc (Ne.symm hab) δ).symm
+
+/-- An additive, monotone-decreasing real function is linear: l(δ) = l(1) * δ.
+    This is the analytic core of Claim 5.7's "additivity implies linearity". -/
+lemma additive_mono_linear {l : Real → Real}
+    (hadd : ∀ δ γ, l (δ + γ) = l δ + l γ)
+    (hmono : ∀ δ γ, δ ≥ γ → l δ ≤ l γ) :
+    ∀ δ, l δ = l 1 * δ := by
+  have h0 : l 0 = 0 := by
+    have h := hadd 0 0
+    simp only [add_zero] at h
+    linarith
+  have hneg : ∀ δ, l (-δ) = -l δ := by
+    intro δ
+    have h := hadd δ (-δ)
+    rw [add_neg_cancel, h0] at h
+    linarith
+  have hnat : ∀ n : ℕ, ∀ δ : Real, l ((n:Real) * δ) = (n:Real) * l δ := by
+    intro n
+    induction n with
+    | zero => intro δ; simp [h0]
+    | succ k ih =>
+      intro δ
+      have hcast : ((k+1 : ℕ) : Real) * δ = (k:Real) * δ + δ := by push_cast; ring
+      rw [hcast, hadd, ih δ]
+      push_cast; ring
+  have hint : ∀ z : ℤ, l (z : Real) = (z : Real) * l 1 := by
+    intro z
+    rcases lt_or_ge z 0 with hz | hz
+    · -- z < 0
+      have hz' : (0:ℤ) ≤ -z := le_of_lt (neg_pos.mpr hz)
+      have h1 : (((-z).natAbs : ℕ) : ℤ) = -z := Int.natAbs_of_nonneg hz'
+      have hcast : (z:Real) = -((((-z).natAbs : ℕ)):Real) := by
+        calc (z:Real) = -(((-z:ℤ)):Real) := by rw [Int.cast_neg]; ring
+          _ = -(((((-z).natAbs:ℕ):ℤ)):Real) := by rw [h1]
+          _ = -((((-z).natAbs:ℕ)):Real) := by rw [Int.cast_natCast]
+      rw [hcast, hneg]
+      have h3 := hnat (-z).natAbs 1
+      rw [mul_one] at h3
+      rw [h3]; ring
+    · -- 0 ≤ z
+      have h1 : ((z.natAbs : ℕ) : ℤ) = z := Int.natAbs_of_nonneg hz
+      have hcast : (z:Real) = ((z.natAbs : ℕ):Real) := by
+        calc (z:Real) = ((((z.natAbs:ℕ):ℤ)):Real) := by rw [h1]
+          _ = ((z.natAbs:ℕ):Real) := by rw [Int.cast_natCast]
+      rw [hcast]
+      have h3 := hnat z.natAbs 1
+      rw [mul_one] at h3
+      exact h3
+  have hrat : ∀ q : ℚ, l (q : Real) = (q : Real) * l 1 := by
+    intro q
+    have hden : ((q.den : ℕ) : Real) ≠ 0 := by
+      have hpos := q.pos
+      exact_mod_cast ne_of_gt hpos
+    have hqcast : (q : Real) = (q.num : Real) / (q.den : Real) := Rat.cast_def q
+    have key : (q.den : Real) * l (q : Real) = (q.num : Real) * l 1 := by
+      have h1 := (hnat q.den (q:Real)).symm
+      have h2 : (q.den:Real) * (q:Real) = (q.num : Real) := by
+        rw [hqcast]
+        have hcan : (q.num:Real)/(q.den:Real) * (q.den:Real) = (q.num:Real) :=
+          div_mul_cancel₀ _ hden
+        linear_combination hcan
+      rw [h1, h2]
+      exact hint q.num
+    have h3 : l (q:Real) = ((q.num:Real) * l 1) / (q.den:Real) := by
+      rw [eq_div_iff hden]
+      linarith [key]
+    rw [h3, hqcast]
+    ring
+  have hsqueeze_pos : ∀ δ : Real, 0 < δ → l δ = l 1 * δ := by
+    intro δ hpos
+    have hc : l 1 ≤ 0 := by
+      have h := hmono 1 0 (by norm_num)
+      rwa [h0] at h
+    have hle : l δ ≤ l 1 * δ := by
+      by_contra hlt
+      rw [not_le] at hlt
+      have hεpos : 0 < l δ - l 1 * δ := by linarith
+      set ε := l δ - l 1 * δ with hεdef
+      set M := |l 1| + 1 with hMdef
+      have hMpos : 0 < M := by rw [hMdef]; have hnn := abs_nonneg (l 1); linarith
+      have hMne : M ≠ 0 := ne_of_gt hMpos
+      have hL : max (δ/2) (δ - ε/(2*M)) < δ := by
+        rw [max_lt_iff]
+        refine ⟨by linarith, ?_⟩
+        have hpos2 : (0:Real) < ε/(2*M) := by positivity
+        linarith
+      obtain ⟨q, hq1, hq2⟩ := exists_rat_btwn hL
+      have hqlt : (q:Real) < δ := hq2
+      have hqsmall : δ - (q:Real) < ε/(2*M) := by
+        have h1 : (δ - ε/(2*M) : Real) ≤ max (δ/2) (δ - ε/(2*M)) := le_max_right _ _
+        linarith
+      have hle1 : l δ ≤ l (q:Real) := hmono δ (q:Real) (le_of_lt hqlt)
+      have hle2 : l (q:Real) = (q:Real) * l 1 := hrat q
+      have hcontra : (q:Real) * l 1 < l δ := by
+        have hdiff : (q:Real) * l 1 - l 1 * δ = |l 1| * (δ - (q:Real)) := by
+          have habs : |l 1| = -(l 1) := abs_of_nonpos hc
+          rw [habs]; ring
+        have hsmall : |l 1| * (δ - (q:Real)) < ε := by
+          have h1 : |l 1| * (δ - (q:Real)) ≤ M * (δ - (q:Real)) :=
+            mul_le_mul_of_nonneg_right (by rw [hMdef]; linarith [abs_nonneg (l 1)])
+              (by linarith)
+          have h2 : M * (δ - (q:Real)) < M * (ε/(2*M)) :=
+            mul_lt_mul_of_pos_left hqsmall hMpos
+          have h3 : M * (ε/(2*M)) = ε/2 := by
+            have h2M : (2:Real) * M ≠ 0 := mul_ne_zero (by norm_num) hMne
+            have hcan : ε/(2*M) * (2*M) = ε := div_mul_cancel₀ ε h2M
+            linear_combination hcan / 2
+          linarith
+        linarith [hdiff, hsmall, hεdef]
+      linarith [hle1, hle2, hcontra]
+    have hge : l 1 * δ ≤ l δ := by
+      by_contra hlt
+      rw [not_le] at hlt
+      have hεpos : 0 < l 1 * δ - l δ := by linarith
+      set ε := l 1 * δ - l δ with hεdef
+      set M := |l 1| + 1 with hMdef
+      have hMpos : 0 < M := by rw [hMdef]; have hnn := abs_nonneg (l 1); linarith
+      have hMne : M ≠ 0 := ne_of_gt hMpos
+      have hL : δ < min (δ+1) (δ + ε/(2*M)) := by
+        rw [lt_min_iff]
+        refine ⟨by linarith, ?_⟩
+        have hpos2 : (0:Real) < ε/(2*M) := by positivity
+        linarith
+      obtain ⟨p, hp1, hp2⟩ := exists_rat_btwn hL
+      have hplt : δ < (p:Real) := hp1
+      have hpsmall : (p:Real) - δ < ε/(2*M) := by
+        have h1 : (min (δ+1) (δ + ε/(2*M)) : Real) ≤ δ + ε/(2*M) := min_le_right _ _
+        linarith
+      have hge1 : l (p:Real) ≤ l δ := hmono (p:Real) δ (le_of_lt hplt)
+      have hge2 : l (p:Real) = (p:Real) * l 1 := hrat p
+      have hcontra : l δ < (p:Real) * l 1 := by
+        have hdiff : (p:Real) * l 1 - l 1 * δ = -(|l 1| * ((p:Real) - δ)) := by
+          have habs : |l 1| = -(l 1) := abs_of_nonpos hc
+          rw [habs]; ring
+        have hsmall : |l 1| * ((p:Real) - δ) < ε := by
+          have h1 : |l 1| * ((p:Real) - δ) ≤ M * ((p:Real) - δ) :=
+            mul_le_mul_of_nonneg_right (by rw [hMdef]; linarith [abs_nonneg (l 1)])
+              (by linarith)
+          have h2 : M * ((p:Real) - δ) < M * (ε/(2*M)) :=
+            mul_lt_mul_of_pos_left hpsmall hMpos
+          have h3 : M * (ε/(2*M)) = ε/2 := by
+            have h2M : (2:Real) * M ≠ 0 := mul_ne_zero (by norm_num) hMne
+            have hcan : ε/(2*M) * (2*M) = ε := div_mul_cancel₀ ε h2M
+            linear_combination hcan / 2
+          linarith
+        linarith [hdiff, hsmall, hεdef]
+      linarith [hge1, hge2, hcontra]
+    exact le_antisymm hle hge
+  intro δ
+  rcases lt_trichotomy δ 0 with hnegδ | heq | hposδ
+  · have hpos' : (0:Real) < -δ := neg_pos.mpr hnegδ
+    have h := hsqueeze_pos (-δ) hpos'
+    rw [hneg δ] at h
+    linarith [h]
+  · rw [heq, h0, mul_zero]
+  · exact hsqueeze_pos δ hposδ
 
 end
 
