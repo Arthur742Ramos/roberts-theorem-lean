@@ -17,6 +17,13 @@ def IsSMon (f : Valuation N A → A) : Prop :=
     f (Function.update v i vi2) = b →
       vi a - vi b > vi2 a - vi2 b
 
+/-- S-MON implies W-MON: the strict gap inequality gives the weak one. -/
+lemma smon_implies_wmon (f : Valuation N A → A) (hsmon : IsSMon f) :
+    IsWMon f := by
+  intro i v vi vi2 a b hab h1 h2
+  have h := hsmon i v vi vi2 a b hab h1 h2
+  linarith
+
 /-- Simultaneous perturbation: bump every agent's value for `x` by `ε`. -/
 def perturb (v : Valuation N A) (x : A) (ε : Real) : Valuation N A :=
   fun i a => v i a + if a = x then ε else 0

@@ -436,47 +436,42 @@ lemma affine_maximizer_transfer (f : Valuation N A → A) (hwmon : IsWMon f)
   rw [heq]
   exact hmax v a
 
-/-- The payment obtained from the original mechanism's menu price for the
-    tie-broken allocation. -/
-noncomputable def tieBreakPay (M : Mechanism N A) (hwmon : IsWMon M.choiceFn)
-    (i : N) (v : Valuation N A) : Real :=
-  price M i v (tieBreak M.choiceFn hwmon v)
-
-/-- The tie-broken choice function with payments recomputed for its selected
-    allocation. -/
-noncomputable def tieBreakMechanism (M : Mechanism N A) (hwmon : IsWMon M.choiceFn) :
-    Mechanism N A :=
-  { choiceFn := tieBreak M.choiceFn hwmon,
-    pay := fun v i => tieBreakPay M hwmon i v }
-
-/-- Recomputing each payment from the original mechanism's menu preserves DSIC
-    under this tie-breaking. -/
-lemma tieBreakMechanism_dsic (M : Mechanism N A) (hdsic : IsDSIC M)
-    (hwmon : IsWMon M.choiceFn) :
-    IsDSIC (tieBreakMechanism M hwmon) := by
-  /-
-  This requires showing that the tie-broken outcome is a utility maximizer in
-  each agent's original menu. Tie-set membership alone only supplies profiles
-  where the outcome is selected after simultaneous perturbation, so the menu
-  transfer remains to be proved.
-  -/
-  sorry
-
 /-- Onto preservation: tie-breaking an onto choice function keeps it onto.
     Every alternative in the range of f remains achievable after tie-breaking. -/
-lemma tieBreakMechanism_onto (M : Mechanism N A) (hwmon : IsWMon M.choiceFn)
-    (honto : Function.Surjective M.choiceFn) :
-    Function.Surjective (tieBreakMechanism M hwmon).choiceFn := by
+lemma tieBreak_onto (f : Valuation N A → A) (hwmon : IsWMon f)
+    (honto : Function.Surjective f) :
+    Function.Surjective (tieBreak f hwmon) := by
   intro a
   obtain ⟨v, hv⟩ := honto a
   refine ⟨perturb v a 1, ?_⟩
-  change tieBreak M.choiceFn hwmon (perturb v a 1) = a
-  exact tieBreak_eq_after_positive_bump M.choiceFn hwmon v a hv 1 one_pos
+  exact tieBreak_eq_after_positive_bump f hwmon v a hv 1 one_pos
 
-/-- Roberts' theorem (M6 assembly): DSIC + onto implies affine maximizer.
-    This proof outline still depends on unresolved induction obligations and on
-    replacing the false claim that the original payments implement the
-    tie-broken rule. -/
+/-- Taxation converse (W-MON → DSIC payments): a weakly monotone choice
+    function can be equipped with payments making it DSIC.
+
+    This is the standard Rochet-style taxation principle converse. Given
+    `IsWMon f`, the menu prices are well-defined (the `price` construction in
+    `Roberts.Taxation`), and the resulting mechanism satisfies DSIC.
+
+    NOTE (2026-09-27): This replaces the false `tieBreakMechanism_dsic`.
+    Reusing the *original* mechanism's menu prices for tie-broken outcomes
+    does NOT preserve DSIC: a counterexample (2 agents, 2 alternatives)
+    shows tie-breaking can force an outcome whose menu price exceeds the
+    agent's value, creating a profitable deviation. The payments must be
+    constructed fresh from the tie-broken choice function's own W-MON
+    structure, not inherited from the original mechanism. -/
+lemma wmon_dsic_payments (f : Valuation N A → A) (hwmon : IsWMon f) :
+    ∃ pay : Valuation N A → N → Real, IsDSIC ⟨f, pay⟩ := by
+  /-
+  Open: formalize the taxation-principle converse. The `price` construction
+  in `Roberts.Taxation` is defined from an existing mechanism's payments;
+  here the payments must be built from the choice function alone via the
+  critical-value / envelope construction, then shown to satisfy DSIC using
+  `IsWMon f`. This is independent of the other open sorries.
+  -/
+  sorry
+
+/-- Roberts' theorem (M6 assembly): DSIC + onto implies affine maximizer. -/
 theorem roberts_theorem (hA : 3 ≤ Fintype.card A)
     (M : Mechanism N A)
     (hdsic : IsDSIC M)
@@ -484,19 +479,20 @@ theorem roberts_theorem (hA : 3 ≤ Fintype.card A)
     IsAffineMaximizer M.choiceFn := by
   -- (a) DSIC gives W-MON (taxation principle).
   have hwmon : IsWMon M.choiceFn := wmon_of_dsic M hdsic
-  -- (b) S-MON reduction: the tie-broken rule is S-MON.
-  have hsmon : IsSMon (tieBreakMechanism M hwmon).choiceFn :=
+  -- (b) S-MON reduction: the tie-broken rule is S-MON (hence W-MON).
+  have hsmon_g : IsSMon (tieBreak M.choiceFn hwmon) :=
     tieBreak_isSMon M.choiceFn hwmon
-  -- (c) Induction (Lemmas 8-10): the tie-broken rule is an affine maximizer.
-  have htb_dsic : IsDSIC (tieBreakMechanism M hwmon) :=
-    tieBreakMechanism_dsic M hdsic hwmon
-  have htb_onto : Function.Surjective (tieBreakMechanism M hwmon).choiceFn :=
-    tieBreakMechanism_onto M hwmon honto
-  have htb_am : IsAffineMaximizer (tieBreakMechanism M hwmon).choiceFn :=
-    dsic_smon_affine_maximizer (tieBreakMechanism M hwmon) htb_dsic hsmon htb_onto hA
-  -- (d) Transfer back to the original choice function.
-  have h_eq : (tieBreakMechanism M hwmon).choiceFn = tieBreak M.choiceFn hwmon := rfl
-  rw [h_eq] at htb_am
+  have hwmon_g : IsWMon (tieBreak M.choiceFn hwmon) :=
+    smon_implies_wmon _ hsmon_g
+  -- (c) Build DSIC payments for the tie-broken choice function from its W-MON.
+  obtain ⟨pay_g, hdsic_g⟩ := wmon_dsic_payments _ hwmon_g
+  -- (d) Induction (Lemmas 8-10): the tie-broken rule is an affine maximizer.
+  have htb_onto : Function.Surjective (tieBreak M.choiceFn hwmon) :=
+    tieBreak_onto M.choiceFn hwmon honto
+  have htb_am : IsAffineMaximizer (tieBreak M.choiceFn hwmon) :=
+    dsic_smon_affine_maximizer ⟨tieBreak M.choiceFn hwmon, pay_g⟩
+      hdsic_g hsmon_g htb_onto hA
+  -- (e) Transfer back to the original choice function.
   exact affine_maximizer_transfer M.choiceFn hwmon htb_am
 
 end
