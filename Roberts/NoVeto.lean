@@ -62,7 +62,8 @@ lemma dictatable_dichotomy (R : (A → Real) → Finset A)
     (hiia : ∀ vj vj2 x, (∀ y, vj x - vj y = vj2 x - vj2 y) → (x ∈ R vj ↔ x ∈ R vj2))
     (hA : 3 ≤ Fintype.card A) :
     (∀ x, IsDictatable R x) ∨ (∀ x, ¬ IsDictatable R x) := by
-  -- A third alternative lets monotonicity and IIA transfer any singleton range to every alternative.
+  -- As stated this is false: for A = Fin 3, R v = {0} satisfies all three
+  -- correspondence hypotheses, but 0 is dictatable and 1 is not.
   sorry
 
 lemma no_veto_of_nondictatable (f : Valuation N A → A) (hsmon : IsSMon f)
@@ -76,8 +77,46 @@ lemma at_most_one_all_dictatable (f : Valuation N A → A) (hsmon : IsSMon f)
     (i j : N) (hij : i ≠ j)
     (hi : ∀ a : A, IsDictatable (range f i) a)
     (hj : ∀ a : A, IsDictatable (range f j) a) : False := by
-  -- Merge the two forcing valuations to obtain incompatible outcomes at one profile.
-  sorry
+  classical
+  have hcard_ne : Fintype.card A ≠ 1 := by omega
+  have habs : ∃ a b : A, a ≠ b := by
+    by_contra h
+    push Not at h
+    obtain ⟨a0⟩ := (inferInstance : Nonempty A)
+    have hcard : Fintype.card A = 1 :=
+      Fintype.card_eq_one_iff.mpr ⟨a0, fun a => h a a0⟩
+    exact hcard_ne hcard
+  obtain ⟨a, b, hab⟩ := habs
+  obtain ⟨vi, hvi⟩ := hi a
+  obtain ⟨vj, hvj⟩ := hj b
+  let v0 : Valuation N A := fun _ _ => 0
+  let w : Valuation N A := Function.update (Function.update v0 i vi) j vj
+  have hcomm : Function.update (Function.update v0 j vj) i vi = w := by
+    funext k
+    by_cases hki : k = i
+    · subst k
+      simp [w, hij]
+    · by_cases hkj : k = j
+      · subst k
+        simp [w, hki]
+      · simp [w, hki, hkj]
+  have hmem_i : f w ∈ range f i vi := by
+    unfold range
+    simp only [Finset.mem_filter]
+    refine ⟨Finset.mem_univ _, ?_⟩
+    refine ⟨Function.update v0 j vj, ?_⟩
+    rw [← hcomm]
+  have hmem_j : f w ∈ range f j vj := by
+    unfold range
+    simp only [Finset.mem_filter]
+    exact ⟨Finset.mem_univ _, ⟨Function.update v0 i vi, rfl⟩⟩
+  have hfa : f w = a := by
+    rw [hvi] at hmem_i
+    exact Finset.mem_singleton.mp hmem_i
+  have hfb : f w = b := by
+    rw [hvj] at hmem_j
+    exact Finset.mem_singleton.mp hmem_j
+  exact hab (hfa.symm.trans hfb)
 
 theorem all_but_one_no_veto (f : Valuation N A → A) (hsmon : IsSMon f)
     (honto : Function.Surjective f) (hA : 3 ≤ Fintype.card A) :
