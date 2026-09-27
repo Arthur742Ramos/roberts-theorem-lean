@@ -57,13 +57,14 @@ lemma range_iia (f : Valuation N A → A) (hsmon : IsSMon f) (i : N)
     exact range_monotone f hsmon i vi2 vi a ha (fun b => le_of_eq (h b).symm)
 
 lemma dictatable_dichotomy (R : (A → Real) → Finset A)
+    (hfull : ∀ a : A, ∃ vj, a ∈ R vj)
     (hne : ∀ vj, (R vj).Nonempty)
     (hmono : ∀ vj vj2 x, x ∈ R vj → (∀ y, vj2 x - vj2 y ≥ vj x - vj y) → x ∈ R vj2)
     (hiia : ∀ vj vj2 x, (∀ y, vj x - vj y = vj2 x - vj2 y) → (x ∈ R vj ↔ x ∈ R vj2))
     (hA : 3 ≤ Fintype.card A) :
     (∀ x, IsDictatable R x) ∨ (∀ x, ¬ IsDictatable R x) := by
-  -- As stated this is false: for A = Fin 3, R v = {0} satisfies all three
-  -- correspondence hypotheses, but 0 is dictatable and 1 is not.
+  -- Full range rules out the false counterexample (R v = {0} for all v):
+  -- with full range, every alternative appears in some range.
   sorry
 
 lemma no_veto_of_nondictatable (f : Valuation N A → A) (hsmon : IsSMon f)
@@ -126,8 +127,18 @@ theorem all_but_one_no_veto (f : Valuation N A → A) (hsmon : IsSMon f)
       (∀ a : A, IsDictatable (range f i) a) ∨
       (∀ a : A, ¬ IsDictatable (range f i) a) := by
     intro i
+    have hfull : ∀ a : A, ∃ vj, a ∈ range f i vj := by
+      intro a
+      obtain ⟨v, hv⟩ := honto a
+      refine ⟨v i, ?_⟩
+      have hupd : Function.update v i (v i) = v := by
+        exact update_self v i
+      unfold range
+      simp only [Finset.mem_filter]
+      exact ⟨Finset.mem_univ _, v, by rw [hupd]; exact hv⟩
     exact dictatable_dichotomy
       (R := range f i)
+      (hfull := hfull)
       (hne := fun vj => range_nonempty f i vj)
       (hmono := fun vj vj2 x hx hgap => range_monotone f hsmon i vj vj2 x hx hgap)
       (hiia := fun vj vj2 x hgap => range_iia f hsmon i vj vj2 x hgap)

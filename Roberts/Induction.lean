@@ -21,18 +21,19 @@ def slice (f : Valuation N A → A) (i₀ : N) (vi₀ : A → Real) : Valuation 
 lemma weights_independent_of_fixed_agent
     (f : Valuation N A → A) (hsmon : IsSMon f)
     (i₀ : N) (hveto : ∀ i, i ≠ i₀ → HasNoVetoPower f i)
+    (hA : 3 ≤ Fintype.card A)
     (w : (A → Real) → N → Real) (k : (A → Real) → A → Real)
     (hrep : ∀ vi₀ : A → Real,
       (∀ i, 0 ≤ w vi₀ i) ∧
       (∀ v a, affineScore (w vi₀) (k vi₀) v (slice f i₀ vi₀ v) ≥
-        affineScore (w vi₀) (k vi₀) v a)) :
+        affineScore (w vi₀) (k vi₀) v a))
+    (hnorm : ∀ vi₀ : A → Real,
+      Finset.univ.sum (fun i => w vi₀ i) = 1) :
     ∀ vi₀ vi₀' i, i ≠ i₀ → w vi₀ i = w vi₀' i := by
   /-
-  These hypotheses do not normalize affine representations: multiplying all
-  weights and offsets in one slice by a positive scalar preserves every argmax.
-  Even identical sliced rules therefore admit representations with different
-  weights (for example, scale one slice's representation by `2`). This equality
-  needs a normalization condition or a conclusion up to positive proportionality.
+  Normalization removes the positive scaling ambiguity. The uniqueness proof
+  still needs the full threshold argument for affine maximizers over an
+  unrestricted domain.
   -/
   sorry
 
@@ -50,12 +51,16 @@ lemma offsets_consistent_of_fixed_agent
       (∀ v a, affineScore (w vi₀) (k vi₀) v (slice f i₀ vi₀ v) ≥
         affineScore (w vi₀) (k vi₀) v a))
     (hwind : ∀ vi₀ vi₀' i, i ≠ i₀ → w vi₀ i = w vi₀' i) :
-    ∀ vi₀ vi₀' a b, k vi₀ a - k vi₀ b = k vi₀' a - k vi₀' b := by
+    ∃ α : Real, ∀ vi₀ vi₀' a b,
+      (k vi₀ a - α * vi₀ a) - (k vi₀ b - α * vi₀ b) =
+      (k vi₀' a - α * vi₀' a) - (k vi₀' b - α * vi₀' b) := by
   /-
-  The usual proof compares switching thresholds between slices after the weights
-  have been normalized and shown to agree. The current development has no slice
-  mechanism on the remaining-agent subtype, so that threshold-transfer argument
-  is not yet represented by the available lemmas.
+  Reformulated: the slice offsets depend affinely on the fixed valuation.
+  In a global affine maximizer with weight α on i₀, the slice offset is
+  k vi₀ a = K a + α * vi₀ a for a global K. Hence (k vi₀ a - α * vi₀ a)
+  has pairwise differences independent of vi₀. The α is the weight on i₀,
+  identified via the switching thresholds. The dictator case (where slices
+  are constant) must be separated before applying this.
   -/
   sorry
 
@@ -198,11 +203,12 @@ theorem dsic_smon_affine_aux (n : ℕ) :
         -- Lemma 10 (offset consistency) to assemble an n-agent affine maximizer.
         /-
         A full implementation needs a subtype-valued sliced mechanism, and the
-        current Lemma 9 statement lacks scale normalization. Also,
-        `all_but_one_no_veto` permits the exceptional agent to be a dictator;
-        fixing that agent's report can make a slice constant rather than onto.
-        The induction hypothesis cannot be applied to every slice with the
-        present hypotheses alone.
+        current Lemma 9 statement is false without scale normalization.
+        Moreover, `HasNoVetoPower` only gives full range when all other reports
+        may vary; it does not give full range after fixing the exceptional
+        agent's report. For a dictator, every such slice is constant, so the
+        induction hypothesis's onto premise fails. These hypotheses do not
+        justify applying the induction hypothesis to every slice.
         -/
         sorry
 
@@ -430,27 +436,29 @@ lemma affine_maximizer_transfer (f : Valuation N A → A) (hwmon : IsWMon f)
   rw [heq]
   exact hmax v a
 
-/-- The tie-broken mechanism: tie-broken choice function with the original payments. -/
+/-- The payment obtained from the original mechanism's menu price for the
+    tie-broken allocation. -/
+noncomputable def tieBreakPay (M : Mechanism N A) (hwmon : IsWMon M.choiceFn)
+    (i : N) (v : Valuation N A) : Real :=
+  price M i v (tieBreak M.choiceFn hwmon v)
+
+/-- The tie-broken choice function with payments recomputed for its selected
+    allocation. -/
 noncomputable def tieBreakMechanism (M : Mechanism N A) (hwmon : IsWMon M.choiceFn) :
     Mechanism N A :=
-  { choiceFn := tieBreak M.choiceFn hwmon, pay := M.pay }
+  { choiceFn := tieBreak M.choiceFn hwmon,
+    pay := fun v i => tieBreakPay M hwmon i v }
 
-/-- Implementability preservation: tie-breaking a DSIC mechanism's choice function
-    (via the simultaneous-perturbation tie-breaking) preserves DSIC. The payments
-    are kept; truthfulness is unaffected because tie-breaking only re-selects among
-    alternatives that the original rule treats as tied. -/
+/-- Recomputing each payment from the original mechanism's menu preserves DSIC
+    under this tie-breaking. -/
 lemma tieBreakMechanism_dsic (M : Mechanism N A) (hdsic : IsDSIC M)
     (hwmon : IsWMon M.choiceFn) :
     IsDSIC (tieBreakMechanism M hwmon) := by
   /-
-  This claim is false with the original payments. For one agent and alternatives
-  `a,b`, let the rule choose `a` exactly when `v(a) - v(b) ≥ c`, and charge `c`
-  for `a` and zero for `b`. It is DSIC. At the threshold, both outcomes are in
-  the simultaneous-perturbation tie set. If the transported order prefers `b`,
-  tie-breaking selects `b` there but keeps the payment `c`; reporting just below
-  the threshold then gets `b` for zero and is strictly better. Recomputing the
-  payment for the tie-broken allocation can repair this, but does not prove the
-  mechanism defined above DSIC.
+  This requires showing that the tie-broken outcome is a utility maximizer in
+  each agent's original menu. Tie-set membership alone only supplies profiles
+  where the outcome is selected after simultaneous perturbation, so the menu
+  transfer remains to be proved.
   -/
   sorry
 
@@ -466,9 +474,9 @@ lemma tieBreakMechanism_onto (M : Mechanism N A) (hwmon : IsWMon M.choiceFn)
   exact tieBreak_eq_after_positive_bump M.choiceFn hwmon v a hv 1 one_pos
 
 /-- Roberts' theorem (M6 assembly): DSIC + onto implies affine maximizer.
-    By the taxation principle DSIC gives W-MON; the S-MON reduction gives a
-    strongly monotone tie-broken rule; the induction (Lemmas 8-10) shows the
-    tie-broken rule is an affine maximizer; transfer gives it for the original. -/
+    This proof outline still depends on unresolved induction obligations and on
+    replacing the false claim that the original payments implement the
+    tie-broken rule. -/
 theorem roberts_theorem (hA : 3 ≤ Fintype.card A)
     (M : Mechanism N A)
     (hdsic : IsDSIC M)
