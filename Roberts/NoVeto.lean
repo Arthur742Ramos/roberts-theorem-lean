@@ -531,17 +531,6 @@ lemma range_boost_full_of_nondictatable (f : Valuation N A → A)
     rw [hdd]; linarith
   exact ⟨delta, hdelta_pos, hfull⟩
 
-lemma dictatable_dichotomy (R : (A → Real) → Finset A)
-    (hfull : ∀ a : A, ∃ vj, a ∈ R vj)
-    (hne : ∀ vj, (R vj).Nonempty)
-    (hmono : ∀ vj vj2 x, x ∈ R vj → (∀ y, vj2 x - vj2 y ≥ vj x - vj y) → x ∈ R vj2)
-    (hiia : ∀ vj vj2 x, (∀ y, vj x - vj y = vj2 x - vj2 y) → (x ∈ R vj ↔ x ∈ R vj2))
-    (hA : 3 ≤ Fintype.card A) :
-    (∀ x, IsDictatable R x) ∨ (∀ x, ¬ IsDictatable R x) := by
-  -- Full range rules out the false counterexample (R v = {0} for all v):
-  -- with full range, every alternative appears in some range.
-  sorry
-
 lemma no_veto_of_nondictatable (f : Valuation N A → A) (hsmon : IsSMon f)
     (honto : Function.Surjective f) (i : N)
     (h : ∀ a : A, ¬ IsDictatable (range f i) a) : HasNoVetoPower f i := by
