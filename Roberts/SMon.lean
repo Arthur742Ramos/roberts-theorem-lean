@@ -305,19 +305,244 @@ private lemma chain_x_source (f : Valuation N A → A) (hwmon : IsWMon f)
     rw [e5, e6] at key
     linarith [hε]
 
+omit [Fintype A] [DecidableEq A] [Nonempty N] [Nonempty A] in
+private lemma outcome_mem_of_gap_increase
+    (f : Valuation N A → A) (hwmon : IsWMon f)
+    (v w : Valuation N A) (P : A → Prop)
+    (hstart : P (f v))
+    (hgap : ∀ j, v j = w j ∨
+      ∀ a b, P a → ¬ P b → v j a - v j b < w j a - w j b) :
+    P (f w) := by
+  classical
+  let D : Finset N := Finset.univ.filter fun j => v j ≠ w j
+  let mid : Finset N → Valuation N A := fun s j => if j ∈ s then w j else v j
+  have hsmall : ∀ s : Finset N, s ⊆ D → P (f (mid s)) := by
+    intro s
+    induction s using Finset.induction with
+    | empty =>
+        intro _
+        simpa [mid] using hstart
+    | @insert j s hj ih =>
+        intro hs
+        have hjD : j ∈ D := hs (by simp)
+        have hsD : s ⊆ D := by
+          intro k hk
+          exact hs (by simp [hk])
+        have htrans : mid (insert j s) = Function.update (mid s) j (w j) := by
+          funext k a
+          by_cases hkj : k = j
+          · subst k
+            simp [mid]
+          · simp [mid, hkj]
+        have hself : Function.update (mid s) j (mid s j) = mid s := by
+          funext k a
+          by_cases hkj : k = j
+          · subst k
+            simp
+          · simp [hkj]
+        let a := f (mid s)
+        let b := f (mid (insert j s))
+        have ha : P a := ih hsD
+        by_cases hb : P b
+        · exact hb
+        · have hab : a ≠ b := by
+            intro heq
+            apply hb
+            rw [← heq]
+            exact ha
+          have hfirst : f (Function.update (mid s) j (mid s j)) = a := by
+            rw [hself]
+          have hsecond : f (Function.update (mid s) j (w j)) = b := by
+            rw [← htrans]
+          have hmon := hwmon j (mid s) (mid s j) (w j) a b hab hfirst hsecond
+          have hjne : v j ≠ w j := by
+            simpa [D] using hjD
+          have hgapj := hgap j
+          rcases hgapj with heq | hgapj
+          · exact (hjne heq).elim
+          · have hmidj : mid s j = v j := by simp [mid, hj]
+            have hstrict := hgapj a b ha hb
+            rw [hmidj] at hmon
+            linarith
+  have hres := hsmall D (by intro j hj; exact hj)
+  have hmidD : mid D = w := by
+    funext j a
+    by_cases hj : j ∈ D
+    · simp [mid, hj]
+    · have hEq : v j = w j := by
+        by_contra hne
+        apply hj
+        simp [D, hne]
+      simp [mid, hj, hEq]
+  simpa [hmidD] using hres
+
 /-- Key lemma (Lavi-Mu'alem-Nisan 2003, Theorem 2): the tie set is monotone
     in the single-agent valuation with respect to pairwise differences.
     If x is tied at v, y is tied at v', and i's (x-y) gap weakly increases
-    from v to v', then x is tied at v'.
-    Taken as an axiom: the 2009 simplified proof omits the detailed argument,
-    and the 2003 original could not be retrieved. Verified true in sum-argmax,
-    single-agent argmax, and constant cases; no counterexample found. -/
-axiom key_lemma (f : Valuation N A → A) (hwmon : IsWMon f)
+    from v to v', then x is tied at v'. -/
+lemma key_lemma (f : Valuation N A → A) (hwmon : IsWMon f)
     (i : N) (v v' : Valuation N A)
     (hsingle : ∀ j, j ≠ i → v j = v' j)
     (x y : A) (hx : x ∈ tieSet f v) (hy : y ∈ tieSet f v')
     (h : v' i x - v' i y ≥ v i x - v i y) :
-    x ∈ tieSet f v'
+    x ∈ tieSet f v' := by
+  classical
+  by_cases hxy : x = y
+  · subst y
+    exact hy
+  have hx' : ∃ δ > 0, ∀ ε ∈ Set.Ioo (0 : Real) δ,
+      f (perturb v x ε) = x := by
+    simpa [tieSet] using hx
+  have hy' : ∃ δ > 0, ∀ ε ∈ Set.Ioo (0 : Real) δ,
+      f (perturb v' y ε) = y := by
+    simpa [tieSet] using hy
+  obtain ⟨δx, hδx, hxprop⟩ := hx'
+  obtain ⟨δy, hδy, hyprop⟩ := hy'
+  let δ := min δx δy
+  change x ∈ Finset.univ.filter (fun a =>
+    ∃ d > 0, ∀ ε ∈ Set.Ioo (0 : Real) d, f (perturb v' a ε) = a)
+  rw [Finset.mem_filter]
+  refine ⟨Finset.mem_univ _, ?_⟩
+  refine ⟨δ, ?_, ?_⟩
+  · dsimp [δ]
+    exact lt_min hδx hδy
+  · intro ε hε
+    let t : Real := ε / 5
+    have hεpos : 0 < ε := hε.1
+    have ht : 0 < t := by
+      dsimp [t]
+      positivity
+    have hεx : ε < δx := lt_of_lt_of_le hε.2 (min_le_left δx δy)
+    have hεy : ε < δy := lt_of_lt_of_le hε.2 (min_le_right δx δy)
+    have htx : t ∈ Set.Ioo (0 : Real) δx := by
+      simp only [Set.mem_Ioo]
+      constructor
+      · exact ht
+      · dsimp [t]
+        linarith
+    have hty : t ∈ Set.Ioo (0 : Real) δy := by
+      simp only [Set.mem_Ioo]
+      constructor
+      · exact ht
+      · dsimp [t]
+        linarith
+    have hpwin : f (perturb v x t) = x := hxprop t htx
+    have hywin : f (perturb v' y t) = y := hyprop t hty
+    have hyx : y ≠ x := by
+      intro hEq
+      exact hxy hEq.symm
+    let p : Valuation N A := perturb v x t
+    let q : Valuation N A := fun j a =>
+      v' j a + (if a = x then 4 * t else 0) + (if a = y then 2 * t else 0)
+    let r : Valuation N A := Function.update q i (p i)
+    let s : Valuation N A := perturb v' y t
+    let final : Valuation N A := perturb v' x (5 * t)
+    have hgap1 : ∀ j, p j = r j ∨
+        ∀ a b, a = x → ¬ b = x → p j a - p j b < r j a - r j b := by
+      intro j
+      by_cases hji : j = i
+      · left
+        simp [r, hji]
+      · right
+        intro a b ha hb
+        subst a
+        have hbase := hsingle j hji
+        by_cases hby : b = y
+        · subst b
+          simp [p, q, r, perturb, hji, hbase, hxy, hyx]
+          linarith
+        · have hbx : b ≠ x := by
+            intro heq
+            exact hb heq
+          simp [p, q, r, perturb, hji, hbase, hxy, hby, hbx]
+          linarith
+    have hrmem := outcome_mem_of_gap_increase f hwmon p r (fun a => a = x)
+      (by simpa [hpwin]) hgap1
+    have hrwin : f r = x := by simpa using hrmem
+    have hgap2 : ∀ j, s j = q j ∨
+        ∀ a b, (a = x ∨ a = y) → ¬ (b = x ∨ b = y) →
+          s j a - s j b < q j a - q j b := by
+      intro j
+      right
+      intro a b ha hb
+      rcases ha with hax | hay
+      · subst a
+        have hbx : b ≠ x := by
+          intro heq
+          exact hb (Or.inl heq)
+        have hby : b ≠ y := by
+          intro heq
+          exact hb (Or.inr heq)
+        simp [s, q, perturb, hxy, hbx, hby]
+        linarith
+      · subst a
+        have hbx : b ≠ x := by
+          intro heq
+          exact hb (Or.inl heq)
+        have hby : b ≠ y := by
+          intro heq
+          exact hb (Or.inr heq)
+        simp [s, q, perturb, hyx, hbx, hby]
+        linarith
+    have hqmem := outcome_mem_of_gap_increase f hwmon s q
+      (fun a => a = x ∨ a = y) (by simp [s, hywin, hyx]) hgap2
+    have hqcases : f q = x ∨ f q = y := by simpa using hqmem
+    have hqwin : f q = x := by
+      rcases hqcases with hqx | hqy
+      · exact hqx
+      · have hri : r i = p i := by simp [r]
+        have hrform : Function.update q i (r i) = r := by
+          rw [hri]
+        have hqself : Function.update q i (q i) = q := by
+          funext j a
+          by_cases hji : j = i
+          · subst j
+            simp
+          · simp [hji]
+        have hfirst : f (Function.update q i (r i)) = x := by
+          rw [hrform]
+          exact hrwin
+        have hsecond : f (Function.update q i (q i)) = y := by
+          rw [hqself]
+          exact hqy
+        have hmon := hwmon i q (r i) (q i) x y hxy hfirst hsecond
+        have hpGap : p i x - p i y =
+            (v i x - v i y) + t := by
+          simp [p, perturb, hyx]
+          linarith
+        have hqGap : q i x - q i y =
+            (v' i x - v' i y) + 2 * t := by
+          simp [q, hxy, hyx]
+          linarith
+        rw [hri, hpGap, hqGap] at hmon
+        linarith
+    have hgap4 : ∀ j, q j = final j ∨
+        ∀ a b, a = x → ¬ b = x → q j a - q j b < final j a - final j b := by
+      intro j
+      right
+      intro a b ha hb
+      subst a
+      have hbx : b ≠ x := by
+        intro heq
+        exact hb heq
+      by_cases hby : b = y
+      · subst b
+        simp [q, final, perturb, hxy, hyx]
+        linarith
+      · simp [q, final, perturb, hxy, hbx, hby]
+        linarith
+    have hfinalmem := outcome_mem_of_gap_increase f hwmon q final
+      (fun a => a = x) (by simp [hqwin]) hgap4
+    have hfinalwin : f final = x := by simpa using hfinalmem
+    have hfinaleq : final = perturb v' x ε := by
+      funext j a
+      simp [final, perturb, t]
+      by_cases hax : a = x
+      · simp [hax]
+        linarith
+      · simp [hax]
+    rw [← hfinaleq]
+    exact hfinalwin
 
 
 /-- The tie-broken choice function is strongly monotone. -/
