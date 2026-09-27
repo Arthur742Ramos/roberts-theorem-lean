@@ -57,8 +57,8 @@ sources:
     author_endorsement: "not-contacted"
     note: >-
       Source of the weak-monotonicity to strong-monotonicity tie-breaking
-      reduction. Its key tie-set transport lemma is currently stated as an
-      axiom in the library pending a full machine-checked proof.
+      reduction. Its key tie-set transport lemma is proved in
+      Roberts/SMon.lean via the asymmetric simultaneous-bump construction.
 
 related_formalizations: []
 
@@ -77,16 +77,13 @@ status:
     existence of weights : N -> Real and k : A -> Real with all weights
     nonnegative and at least one nonzero weight, such that f v always
     maximizes the affine score (sum i, weights i * v i a) + k a. The library
-    currently contains 13 sorry placeholders and one axiom,
-    Roberts.key_lemma, the tie-set transport lemma from Lavi-Mualem-Nisan
-    2003 used by the strong-monotonicity reduction.
-  sorry_count: 13
+    contains zero sorry placeholders and no custom axioms.
+  sorry_count: 0
   sorry_in_definitions: 0
   axioms:
     - "propext"
     - "Classical.choice"
     - "Quot.sound"
-    - "Roberts.key_lemma"
   main_results:
     - declaration: "Roberts.roberts_theorem"
       file: "Solution.lean"
@@ -96,8 +93,8 @@ status:
         Given hdsic : IsDSIC M and honto : Function.Surjective M.choiceFn,
         the choice function M.choiceFn is an affine maximizer:
         IsAffineMaximizer M.choiceFn.
-      sorry_count: 13
-      axioms: ["propext", "Classical.choice", "Quot.sound", "Roberts.key_lemma"]
+      sorry_count: 0
+      axioms: ["propext", "Classical.choice", "Quot.sound"]
       comparator_config: "comparator.json"
 
 automation:
@@ -127,9 +124,8 @@ fidelity:
     agent and alternative types and real-valued valuations. Onto is an
     explicit hypothesis. The affine-maximizer conclusion asserts argmax
     membership and therefore permits arbitrary tie choices. Randomization
-    is excluded. The library proof currently relies on 13 sorry placeholders
-    and one axiom, Roberts.key_lemma, the tie-set transport lemma from
-    Lavi-Mualem-Nisan 2003; these must be discharged before submission.
+    is excluded. The library is fully proved with zero sorries and only
+    the standard Lean axioms (propext, Classical.choice, Quot.sound).
 
 alignment:
   namespace: "Roberts"
@@ -163,8 +159,8 @@ alignment:
       status: "proved"
       note: >-
         With 3 <= Fintype.card A, DSIC and onto imply the choice function
-        is an affine maximizer. The proof currently depends on library
-        sorries and the key_lemma axiom.
+        is an affine maximizer. Fully proved with zero sorries; the
+        key tie-set transport lemma is proved in Roberts/SMon.lean.
 
 review:
   status: "self-assessed"

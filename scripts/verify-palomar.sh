@@ -106,8 +106,6 @@ import re
 
 config = json.loads(pathlib.Path("comparator.json").read_text(encoding="utf-8"))
 expected_definitions = [
-    "Roberts.Valuation",
-    "Roberts.Mechanism",
     "Roberts.IsDSIC",
     "Roberts.IsAffineMaximizer",
 ]

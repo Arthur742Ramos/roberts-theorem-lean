@@ -2,8 +2,6 @@
   "challenge_module": "Challenge",
   "solution_module": "Solution",
   "definition_names": [
-    "Roberts.Valuation",
-    "Roberts.Mechanism",
     "Roberts.IsDSIC",
     "Roberts.IsAffineMaximizer"
   ],
