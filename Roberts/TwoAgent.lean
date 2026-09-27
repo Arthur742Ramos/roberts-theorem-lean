@@ -504,6 +504,158 @@ lemma additive_mono_linear {l : Real → Real}
   · rw [heq, h0, mul_zero]
   · exact hsqueeze_pos δ hposδ
 
+/-- The increment function for Claim 5.7: `l(δ)` is the profile-independent
+normalized-price increment when `i1` bumps `a0` by `δ`. -/
+noncomputable def incrFun (M : Mechanism N A) (i1 i2 : N) (c0 a0 : A) (δ : Real) : Real :=
+  normPrice M i2 c0 (bumpVal i1 (fun _ _ => 0) a0 δ) a0 -
+    normPrice M i2 c0 (fun _ _ => 0) a0
+
+/-- `l` is additive (from Claim 5.7, `incr_const`). -/
+lemma incrFun_add {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+    {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
+    (hdec : HasNoVetoPower M.choiceFn i1) (c0 : A) (hA : 3 ≤ Fintype.card A)
+    (a0 : A) (ha0 : a0 ≠ c0) (δ γ : Real) :
+    incrFun M i1 i2 c0 a0 (δ + γ) =
+      incrFun M i1 i2 c0 a0 δ + incrFun M i1 i2 c0 a0 γ := by
+  have hbb : bumpVal i1 (bumpVal i1 (fun _ _ => (0:Real)) a0 δ) a0 γ =
+      bumpVal i1 (fun _ _ => 0) a0 (δ + γ) := by
+    funext j a'
+    by_cases hj : j = i1
+    · subst hj
+      simp only [bumpVal_i1]
+      by_cases haa : a' = a0 <;> simp [haa]
+    · simp only [bumpVal_j_ne i1 _ _ _ hj]
+  have hincr := incr_const hdsic hsmon h12 hall hdec c0 hA a0 ha0 γ
+    (bumpVal i1 (fun _ _ => (0:Real)) a0 δ) (fun _ _ => 0)
+  rw [hbb] at hincr
+  unfold incrFun
+  linarith
+
+/-- `l` is monotone-decreasing (from Claim 5.3, `pairwise_le`). -/
+lemma incrFun_mono {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+    {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
+    (hdec : HasNoVetoPower M.choiceFn i1) (c0 a0 : A) (ha0 : a0 ≠ c0)
+    {δ γ : Real} (h : δ ≥ γ) :
+    incrFun M i1 i2 c0 a0 δ ≤ incrFun M i1 i2 c0 a0 γ := by
+  have hle := pairwise_le hdsic hsmon h12 hall hdec
+    (bumpVal i1 (fun _ _ => (0:Real)) a0 δ) (bumpVal i1 (fun _ _ => (0:Real)) a0 γ)
+    a0 c0 ha0 (by
+      rw [bumpVal_adiff i1 _ a0 c0 δ ha0, bumpVal_adiff i1 _ a0 c0 γ ha0]
+      show (0 + δ) - (0:Real) ≥ (0 + γ) - 0
+      linarith)
+  unfold incrFun normPrice
+  linarith
+
+/-- `l` is linear: `l(δ) = l(1) * δ` (Claim 5.7 + the analytic lemma). -/
+lemma incrFun_linear {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+    {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
+    (hdec : HasNoVetoPower M.choiceFn i1) (c0 : A) (hA : 3 ≤ Fintype.card A)
+    (a0 : A) (ha0 : a0 ≠ c0) (δ : Real) :
+    incrFun M i1 i2 c0 a0 δ = incrFun M i1 i2 c0 a0 1 * δ := by
+  have hadd := incrFun_add hdsic hsmon h12 hall hdec c0 hA a0 ha0
+  have hmono : ∀ δ γ : Real, δ ≥ γ →
+      incrFun M i1 i2 c0 a0 δ ≤ incrFun M i1 i2 c0 a0 γ :=
+    fun δ γ h => incrFun_mono hdsic hsmon h12 hall hdec c0 a0 ha0 h
+  exact additive_mono_linear hadd hmono δ
+
+/-- The normalized price is affine in `i1`'s value-difference (Claims 5.6-5.7). -/
+lemma Q_affine {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+    {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
+    (hdec : HasNoVetoPower M.choiceFn i1) (c0 : A) (_hA : 3 ≤ Fintype.card A)
+    (a0 : A) (ha0 : a0 ≠ c0) (v : Valuation N A) (a : A) (ha : a ≠ c0) :
+    normPrice M i2 c0 v a - normPrice M i2 c0 (fun _ _ => 0) a =
+      incrFun M i1 i2 c0 a0 (v i1 a - v i1 c0) := by
+  have h1 : normPrice M i2 c0 v a =
+      normPrice M i2 c0 (bumpVal i1 (fun _ _ => (0:Real)) a (v i1 a - v i1 c0)) a := by
+    apply Q_pairwise hdsic hsmon h12 hall hdec c0 _ _ _ ha
+    rw [bumpVal_adiff i1 _ a c0 _ ha]
+    show v i1 a - v i1 c0 = (0 + (v i1 a - v i1 c0)) - (0:Real)
+    ring
+  have h2 : normPrice M i2 c0 (bumpVal i1 (fun _ _ => (0:Real)) a (v i1 a - v i1 c0)) a -
+      normPrice M i2 c0 (fun _ _ => 0) a =
+      incrFun M i1 i2 c0 a0 (v i1 a - v i1 c0) := by
+    unfold incrFun
+    by_cases haa0 : a = a0
+    · subst haa0; rfl
+    · exact incr_eq hdsic hsmon h12 hall hdec c0 (fun _ _ => 0) a a0 ha ha0 haa0 _
+  linarith [h1, h2]
+
+/-- Claim 5.4 (two-agent): `i2`'s prices are affine in `i1`'s valuation. -/
+theorem price_affine_form {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+    {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
+    (hdec : HasNoVetoPower M.choiceFn i1) (hA : 3 ≤ Fintype.card A) :
+    HasAffinePrices M i2 i1 := by
+  obtain ⟨c0⟩ := (inferInstance : Nonempty A)
+  obtain ⟨a0, ha0⟩ := Fintype.exists_ne_of_one_lt_card (by omega) c0
+  have hadd := incrFun_add hdsic hsmon h12 hall hdec c0 hA a0 ha0
+  have hmono : ∀ δ γ : Real, δ ≥ γ →
+      incrFun M i1 i2 c0 a0 δ ≤ incrFun M i1 i2 c0 a0 γ :=
+    fun δ γ h => incrFun_mono hdsic hsmon h12 hall hdec c0 a0 ha0 h
+  have hlin := additive_mono_linear hadd hmono
+  have hαnonneg : (0:Real) ≤ -(incrFun M i1 i2 c0 a0 1) := by
+    have h1 := hmono 1 0 (by norm_num)
+    have hz : incrFun M i1 i2 c0 a0 0 = 0 := by
+      unfold incrFun; rw [bumpVal_zero, sub_self]
+    linarith
+  have heq : ∀ v a, price M i2 v a =
+      (price M i2 v c0 + (-(incrFun M i1 i2 c0 a0 1)) * v i1 c0) -
+      (-(incrFun M i1 i2 c0 a0 1)) * v i1 a -
+      (-(normPrice M i2 c0 (fun _ _ => 0) a)) := by
+    intro v a
+    by_cases ha : a = c0
+    · rw [ha]
+      have hQc0 : normPrice M i2 c0 (fun _ _ => (0:Real)) c0 = 0 := by
+        unfold normPrice; ring
+      rw [hQc0]; ring
+    · have hQ := Q_affine hdsic hsmon h12 hall hdec c0 hA a0 ha0 v a ha
+      have hlin_a := hlin (v i1 a - v i1 c0)
+      unfold normPrice at hQ ⊢
+      linarith
+  exact ⟨-(incrFun M i1 i2 c0 a0 1), hαnonneg,
+    (fun v => price M i2 v c0 + (-(incrFun M i1 i2 c0 a0 1)) * v i1 c0),
+    (fun a => -(normPrice M i2 c0 (fun _ _ => 0) a)), heq⟩
+
+/-- Lemma 5.1 (two-agent Roberts): a DSIC mechanism for two agents with no veto
+power is an affine maximizer. -/
+theorem two_agent_affine_maximizer {M : Mechanism N A} (hdsic : IsDSIC M)
+    (hsmon : IsSMon M.choiceFn)
+    {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
+    (hdec : HasNoVetoPower M.choiceFn i1) (hA : 3 ≤ Fintype.card A) :
+    IsAffineMaximizer M.choiceFn := by
+  obtain ⟨alpha, halpha, h, beta, heq⟩ := price_affine_form hdsic hsmon h12 hall hdec hA
+  set weights : N → Real := fun i => if i = i1 then alpha else 1 with hw
+  have huniv : (Finset.univ : Finset N) = {i1, i2} := by
+    ext i
+    simp only [Finset.mem_univ, Finset.mem_insert, Finset.mem_singleton, true_iff]
+    exact hall i
+  have hsum : ∀ (v : Valuation N A) (b : A),
+      (Finset.univ.sum fun i => weights i * v i b) = alpha * v i1 b + v i2 b := by
+    intro v b
+    rw [huniv, Finset.sum_pair h12]
+    have w1 : weights i1 = alpha := by simp [hw]
+    have w2 : weights i2 = 1 := by simp [hw, Ne.symm h12]
+    rw [w1, w2]
+    ring
+  refine ⟨weights, beta, ?_, ?_, ?_⟩
+  · intro i
+    rcases hall i with hi1 | hi2
+    · have w1 : weights i = alpha := by simp [hw, hi1]
+      rw [w1]; exact halpha
+    · have w2 : weights i = 1 := by simp [hw, hi2, Ne.symm h12]
+      rw [w2]; norm_num
+  · refine ⟨i2, ?_⟩
+    have w2 : weights i2 = 1 := by simp [hw, Ne.symm h12]
+    rw [w2]
+    norm_num
+  · intro v a
+    have htax := taxation_ineq M hdsic i2 v (v i2) a (achievable_of_noVeto h12 hall hdec v a)
+    rw [update_self] at htax
+    have e1 := heq v (M.choiceFn v)
+    have e2 := heq v a
+    unfold affineScore
+    rw [hsum v (M.choiceFn v), hsum v a]
+    linarith
+
 end
 
 end Roberts
