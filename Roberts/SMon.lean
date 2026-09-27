@@ -53,7 +53,43 @@ lemma bump_winner_stable (f : Valuation N A → A) (hwmon : IsWMon f)
 lemma perturb_stable_aux (f : Valuation N A → A) (hwmon : IsWMon f)
     (v : Valuation N A) (ε : Real) (hε : 0 < ε) (s : Finset N) :
     f (fun i a => v i a + (if i ∈ s ∧ a = f v then ε else 0)) = f v := by
-  sorry
+  classical
+  induction s using Finset.induction with
+  | empty =>
+    have heq : (fun i a => v i a + (if i ∈ (∅ : Finset N) ∧ a = f v then ε else 0)) = v := by
+      funext i a
+      simp
+    rw [heq]
+  | insert x t hx ih =>
+    -- Define w_t as the t-bumped valuation
+    set w_t := fun i a => v i a + (if i ∈ t ∧ a = f v then ε else 0) with hw_t
+    -- The (insert x t)-bumped valuation equals Function.update w_t x (bumped x-valuation)
+    have heq : (fun i a => v i a + (if i ∈ insert x t ∧ a = f v then ε else 0))
+        = Function.update w_t x (fun a => w_t x a + if a = f w_t then ε else 0) := by
+      funext i a
+      by_cases hi : i = x
+      · -- Case i = x: use hi to rewrite, avoid subst
+        rw [hi, Function.update_self]
+        -- x ∉ t, so w_t x a = v x a
+        have hwtx : w_t x a = v x a := by
+          simp [hw_t, hx]
+        rw [hwtx, ih]
+        by_cases ha : a = f v
+        · simp [ha, Finset.mem_insert_self, hi]
+        · simp [ha, hi]
+      · rw [Function.update_of_ne hi]
+        simp [hw_t]
+        by_cases hit : i ∈ t
+        · by_cases ha : a = f v
+          · simp [hit, ha, Finset.mem_insert_of_mem hit, hi]
+          · simp [hit, ha, hi]
+        · by_cases ha : a = f v
+          · simp [Finset.mem_insert, hi, hit, ha] at *
+          · simp [hit, ha, hi]
+    rw [heq]
+    -- Apply bump_winner_stable: f (update w_t x (bumped)) = f w_t = f v (by ih)
+    have h_bump := bump_winner_stable f hwmon w_t x ε hε
+    rw [h_bump, ih]
 
 
 /-- f(v) is always in its own tie set (by bumping the winner). -/
