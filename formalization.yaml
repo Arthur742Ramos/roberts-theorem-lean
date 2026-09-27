@@ -1,0 +1,180 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/mathlib-initiative/formalization.yaml/main/schema/formalization.schema.json
+version: "v0.4"
+
+project:
+  name: "roberts-theorem-lean"
+  description: >-
+    A Lean formalization of Roberts theorem: for finite nonempty agent and
+    alternative types with at least three alternatives, every onto
+    dominant-strategy incentive compatible choice function is an affine
+    maximizer. The proof follows the modular route: the taxation principle
+    and weak monotonicity, reduction to strong monotonicity by tie-breaking,
+    no-veto-power range analysis, the two-agent affine price representation,
+    and induction on the number of agents.
+  authors:
+    - "Arthur Freitas Ramos"
+  responsible_maintainers:
+    - "Arthur Freitas Ramos"
+  license: "BSD-3-Clause"
+
+sources:
+  - title: "The characterization of implementable choice rules"
+    authors:
+      - "Kevin W. S. Roberts"
+    type: "incollection"
+    location: >-
+      In J.-J. Laffont (editor), Aggregation and Revelation of Preferences,
+      Papers presented at the first European Summer Workshop of the
+      Econometric Society, pages 321-349. North-Holland, 1979.
+    relationship: "formalizes"
+    author_endorsement: "not-contacted"
+    note: >-
+      The original statement and proof of Roberts theorem.
+  - title: "A Modular Approach to Roberts Theorem"
+    authors:
+      - "Shahar Dobzinski"
+      - "Noam Nisan"
+    type: "inproceedings"
+    location: >-
+      Proceedings of the 2nd International Symposium on Algorithmic Game
+      Theory (SAGT 2009). Springer, 2009.
+    relationship: "formalizes"
+    author_endorsement: "not-contacted"
+    note: >-
+      The modular proof route followed by this formalization: weak
+      monotonicity, no-veto power, the two-agent affine representation,
+      and induction on the number of agents.
+  - title: "Towards a Characterization of Truthful Combinatorial Auctions"
+    authors:
+      - "Ron Lavi"
+      - "Ahuva Mualem"
+      - "Noam Nisan"
+    type: "inproceedings"
+    location: >-
+      Proceedings of the 44th Annual IEEE Symposium on Foundations of
+      Computer Science (FOCS 2003). IEEE, 2003.
+    relationship: "uses"
+    author_endorsement: "not-contacted"
+    note: >-
+      Source of the weak-monotonicity to strong-monotonicity tie-breaking
+      reduction. Its key tie-set transport lemma is currently stated as an
+      axiom in the library pending a full machine-checked proof.
+
+related_formalizations: []
+
+classification:
+  arxiv:
+    - "cs.GT"
+    - "econ.TH"
+
+status:
+  scope: >-
+    The agent and alternative types N and A are finite, nonempty, and have
+    decidable equality, with 3 <= Fintype.card A. The headline theorem
+    Roberts.roberts_theorem takes M : Mechanism N A, hdsic : IsDSIC M, and
+    honto : Function.Surjective M.choiceFn, and concludes
+    IsAffineMaximizer M.choiceFn, where IsAffineMaximizer f asserts the
+    existence of weights : N -> Real and k : A -> Real with all weights
+    nonnegative and at least one nonzero weight, such that f v always
+    maximizes the affine score (sum i, weights i * v i a) + k a. The library
+    currently contains 13 sorry placeholders and one axiom,
+    Roberts.key_lemma, the tie-set transport lemma from Lavi-Mualem-Nisan
+    2003 used by the strong-monotonicity reduction.
+  sorry_count: 13
+  sorry_in_definitions: 0
+  axioms:
+    - "propext"
+    - "Classical.choice"
+    - "Quot.sound"
+    - "Roberts.key_lemma"
+  main_results:
+    - declaration: "Roberts.roberts_theorem"
+      file: "Solution.lean"
+      description: >-
+        For finite nonempty agent and alternative types N and A with
+        decidable equality and 3 <= Fintype.card A, let M : Mechanism N A.
+        Given hdsic : IsDSIC M and honto : Function.Surjective M.choiceFn,
+        the choice function M.choiceFn is an affine maximizer:
+        IsAffineMaximizer M.choiceFn.
+      sorry_count: 13
+      axioms: ["propext", "Classical.choice", "Quot.sound", "Roberts.key_lemma"]
+      comparator_config: "comparator.json"
+
+automation:
+  methods:
+    - method: "agent"
+      models:
+        - "GPT-6-Luna via Codex"
+      framework: "Lean 4 v4.35.0-rc2 and Mathlib v4.35.0-rc2"
+      tool_setup: >-
+        The Lean toolchain is pinned by lean-toolchain and the Mathlib revision
+        is pinned in lakefile.toml.
+      cost:
+        wall_time: "not tracked"
+        spend_usd: "subscription-based"
+        hardware: "local machine"
+      prompting_notes: >-
+        The implementation is checked by Lean; Challenge.lean separately
+        states the comparator declarations with 3 intentional placeholders.
+  spend_usd: "subscription-based"
+  notes: >-
+    AI assistance was used for formalization and packaging. No Palomar
+    submission or registration was performed as part of this work.
+
+fidelity:
+  divergences: >-
+    The formal model is a finite social-choice setting with finite nonempty
+    agent and alternative types and real-valued valuations. Onto is an
+    explicit hypothesis. The affine-maximizer conclusion asserts argmax
+    membership and therefore permits arbitrary tie choices. Randomization
+    is excluded. The library proof currently relies on 13 sorry placeholders
+    and one axiom, Roberts.key_lemma, the tie-set transport lemma from
+    Lavi-Mualem-Nisan 2003; these must be discharged before submission.
+
+alignment:
+  namespace: "Roberts"
+  statements:
+    - source: "Valuation profile and direct-revelation mechanism"
+      lean: "Roberts.Valuation; Roberts.Mechanism"
+      module: "Roberts/Defs.lean"
+      status: "defined"
+      note: >-
+        Valuation N A is N -> A -> Real. Mechanism N A bundles a choice
+        function Valuation N A -> A with a payment rule
+        Valuation N A -> N -> Real.
+    - source: "Dominant-strategy incentive compatibility"
+      lean: "Roberts.IsDSIC"
+      module: "Roberts/Defs.lean"
+      status: "defined"
+      note: >-
+        For every agent i, profile v, and unilateral deviation vi2,
+        truthful reporting maximizes quasilinear utility.
+    - source: "Affine maximizer"
+      lean: "Roberts.IsAffineMaximizer"
+      module: "Roberts/Defs.lean"
+      status: "defined"
+      note: >-
+        There are nonnegative weights, not all zero, and an alternative
+        offset k such that the choice function always selects an affine
+        score maximizer.
+    - source: "Roberts theorem"
+      lean: "Roberts.roberts_theorem"
+      module: "Roberts/Induction.lean"
+      status: "proved"
+      note: >-
+        With 3 <= Fintype.card A, DSIC and onto imply the choice function
+        is an affine maximizer. The proof currently depends on library
+        sorries and the key_lemma axiom.
+
+review:
+  status: "self-assessed"
+  reviewers:
+    - "none"
+  notes: >-
+    Local compilation, comparator declaration checks, placeholder scanning,
+    and the axioms audit are recorded by scripts/verify-palomar.sh.
+    No external or registry review is claimed.
+
+acknowledgements: >-
+  Mathlib contributors and Kevin W. S. Roberts, Shahar Dobzinski, Noam Nisan,
+  Ron Lavi, and Ahuva Mualem for foundational mechanism-design results.

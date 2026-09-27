@@ -1,0 +1,18 @@
+{
+  "challenge_module": "Challenge",
+  "solution_module": "Solution",
+  "definition_names": [
+    "Roberts.Valuation",
+    "Roberts.Mechanism",
+    "Roberts.IsDSIC",
+    "Roberts.IsAffineMaximizer"
+  ],
+  "theorem_names": [
+    "Roberts.roberts_theorem"
+  ],
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ]
+}
