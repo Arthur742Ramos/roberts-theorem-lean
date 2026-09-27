@@ -1,5 +1,6 @@
 import Roberts.TwoAgent
 import Mathlib.Algebra.BigOperators.Ring.Finset
+import Mathlib.Analysis.Real.Sqrt
 
 namespace Roberts
 
@@ -8,10 +9,603 @@ section
 variable {N A : Type*} [Fintype N] [Fintype A] [DecidableEq N] [DecidableEq A]
   [Nonempty N] [Nonempty A]
 
+private lemma halfspace_homog (u u' : N → Real) (hne : u' ≠ 0)
+    (hsub : ∀ z : N → Real,
+      0 < Finset.univ.sum (fun i => u' i * z i) →
+        0 ≤ Finset.univ.sum (fun i => u i * z i)) :
+    ∃ alpha : Real, 0 ≤ alpha ∧ ∀ i, u i = alpha * u' i := by
+  classical
+  let S2 : Real := Finset.univ.sum (fun i => (u' i) ^ 2)
+  obtain ⟨j, hj⟩ := Function.ne_iff.mp hne
+  have hjpos : 0 < (u' j) ^ 2 := sq_pos_of_ne_zero hj
+  have hS2lower : (u' j) ^ 2 ≤ S2 := by
+    dsimp [S2]
+    exact Finset.single_le_sum
+      (fun i hi => sq_nonneg (u' i)) (Finset.mem_univ j)
+  have hS2pos : 0 < S2 := lt_of_lt_of_le hjpos hS2lower
+  let alpha : Real := (Finset.univ.sum (fun i => u i * u' i)) / S2
+  let m : N → Real := fun i => u i - alpha * u' i
+  have halphaS2 : alpha * S2 = Finset.univ.sum (fun i => u i * u' i) := by
+    dsimp [alpha]
+    exact div_mul_cancel₀ _ (ne_of_gt hS2pos)
+  have horth : Finset.univ.sum (fun i => m i * u' i) = 0 := by
+    calc
+      Finset.univ.sum (fun i => m i * u' i) =
+          Finset.univ.sum (fun i => u i * u' i - alpha * (u' i) ^ 2) := by
+        apply Finset.sum_congr rfl
+        intro i hi
+        dsimp [m]
+        ring
+      _ = Finset.univ.sum (fun i => u i * u' i) -
+          Finset.univ.sum (fun i => alpha * (u' i) ^ 2) := by
+        rw [Finset.sum_sub_distrib]
+      _ = Finset.univ.sum (fun i => u i * u' i) - alpha * S2 := by
+        congr 1
+        calc
+          Finset.univ.sum (fun i => alpha * (u' i) ^ 2) =
+              alpha * Finset.univ.sum (fun i => (u' i) ^ 2) := by
+            rw [Finset.mul_sum]
+          _ = alpha * S2 := by rfl
+      _ = 0 := by rw [← halphaS2]; ring
+  have hdecomp : ∀ i, u i = alpha * u' i + m i := by
+    intro i
+    dsimp [m]
+    ring
+  have hdual (t : Real) :
+      Finset.univ.sum (fun i => u' i * (-m i + t * u' i)) = t * S2 := by
+    have hcross : Finset.univ.sum (fun i => u' i * m i) = 0 := by
+      calc
+        Finset.univ.sum (fun i => u' i * m i) =
+            Finset.univ.sum (fun i => m i * u' i) := by
+          apply Finset.sum_congr rfl
+          intro i hi
+          ring
+        _ = 0 := horth
+    have hterm : Finset.univ.sum (fun i => t * (u' i) ^ 2) = t * S2 := by
+      calc
+        Finset.univ.sum (fun i => t * (u' i) ^ 2) =
+            t * Finset.univ.sum (fun i => (u' i) ^ 2) := by
+          exact (Finset.mul_sum Finset.univ
+            (fun i => (u' i) ^ 2) t).symm
+        _ = t * S2 := by rfl
+    calc
+      Finset.univ.sum (fun i => u' i * (-m i + t * u' i)) =
+          Finset.univ.sum (fun i => -(u' i * m i) + t * (u' i) ^ 2) := by
+        apply Finset.sum_congr rfl
+        intro i hi
+        ring
+      _ = Finset.univ.sum (fun i => -(u' i * m i)) +
+          Finset.univ.sum (fun i => t * (u' i) ^ 2) := by
+        rw [Finset.sum_add_distrib]
+      _ = t * S2 := by
+        rw [Finset.sum_neg_distrib, hcross, hterm]
+        ring
+  have hscore (t : Real) :
+      Finset.univ.sum (fun i => u i * (-m i + t * u' i)) =
+        -Finset.univ.sum (fun i => (m i) ^ 2) + alpha * t * S2 := by
+    calc
+      Finset.univ.sum (fun i => u i * (-m i + t * u' i)) =
+          Finset.univ.sum (fun i =>
+            (-(m i) ^ 2) + alpha * t * (u' i) ^ 2 +
+              (t - alpha) * (m i * u' i)) := by
+        apply Finset.sum_congr rfl
+        intro i hi
+        rw [hdecomp i]
+        ring
+      _ = -(Finset.univ.sum (fun i => (m i) ^ 2)) +
+          alpha * t * S2 + (t - alpha) *
+            Finset.univ.sum (fun i => m i * u' i) := by
+        have hsq : Finset.univ.sum (fun i => alpha * t * (u' i) ^ 2) =
+            alpha * t * S2 := by
+          calc
+            Finset.univ.sum (fun i => alpha * t * (u' i) ^ 2) =
+                alpha * t * Finset.univ.sum (fun i => (u' i) ^ 2) := by
+              exact (Finset.mul_sum Finset.univ
+                (fun i => (u' i) ^ 2) (alpha * t)).symm
+            _ = alpha * t * S2 := by rfl
+        have hmix : Finset.univ.sum
+            (fun i => (t - alpha) * (m i * u' i)) =
+              (t - alpha) * Finset.univ.sum (fun i => m i * u' i) := by
+          exact (Finset.mul_sum Finset.univ
+            (fun i => m i * u' i) (t - alpha)).symm
+        rw [Finset.sum_add_distrib, Finset.sum_add_distrib,
+          Finset.sum_neg_distrib, hsq, hmix]
+      _ = -Finset.univ.sum (fun i => (m i) ^ 2) + alpha * t * S2 := by
+        rw [horth]
+        ring
+  have hmzero : ∀ i, m i = 0 := by
+    intro i
+    by_contra hmi
+    have hmisq : 0 < (m i) ^ 2 := sq_pos_of_ne_zero hmi
+    let S3 : Real := Finset.univ.sum (fun j => (m j) ^ 2)
+    have hS3lower : (m i) ^ 2 ≤ S3 := by
+      dsimp [S3]
+      exact Finset.single_le_sum
+        (fun j hj => sq_nonneg (m j)) (Finset.mem_univ i)
+    have hS3pos : 0 < S3 := lt_of_lt_of_le hmisq hS3lower
+    by_cases halpha : alpha ≤ 0
+    · let t : Real := 1
+      have ht : 0 < t := by norm_num [t]
+      have hzpos : 0 < Finset.univ.sum
+          (fun j => u' j * (-m j + t * u' j)) := by
+        rw [hdual t]
+        exact mul_pos ht hS2pos
+      have hnonneg := hsub (fun j => -m j + t * u' j) hzpos
+      rw [hscore t] at hnonneg
+      have hbad : -S3 + alpha * t * S2 < 0 := by
+        dsimp [t]
+        nlinarith
+      linarith
+    · have hapos : 0 < alpha := lt_of_not_ge halpha
+      let t : Real := S3 / (2 * alpha * S2)
+      have ht : 0 < t := by
+        dsimp [t]
+        positivity
+      have hzpos : 0 < Finset.univ.sum
+          (fun j => u' j * (-m j + t * u' j)) := by
+        rw [hdual t]
+        exact mul_pos ht hS2pos
+      have hnonneg := hsub (fun j => -m j + t * u' j) hzpos
+      rw [hscore t] at hnonneg
+      have hcalc : alpha * t * S2 = S3 / 2 := by
+        dsimp [t]
+        field_simp
+      have hbad : -S3 + alpha * t * S2 < 0 := by
+        rw [hcalc]
+        linarith
+      linarith
+  have hu : ∀ i, u i = alpha * u' i := by
+    intro i
+    rw [hdecomp i, hmzero i]
+    ring
+  have hdot : Finset.univ.sum (fun i => u i * u' i) = alpha * S2 := by
+    calc
+      Finset.univ.sum (fun i => u i * u' i) =
+          Finset.univ.sum (fun i => alpha * (u' i) ^ 2) := by
+        apply Finset.sum_congr rfl
+        intro i hi
+        rw [hu i]
+        ring
+      _ = alpha * S2 := by
+        rw [Finset.mul_sum]
+  have hdot_nonneg : 0 ≤ Finset.univ.sum (fun i => u i * u' i) := by
+    apply hsub u'
+    simpa [S2, pow_two] using hS2pos
+  refine ⟨alpha, ?_, hu⟩
+  rw [hdot] at hdot_nonneg
+  nlinarith
+
 /-- The choice function with agent i₀'s valuation fixed at vi₀. Used to state
     the per-slice affine representations in the n ≥ 3 induction step. -/
 def slice (f : Valuation N A → A) (i₀ : N) (vi₀ : A → Real) : Valuation N A → A :=
   fun v => f (Function.update v i₀ vi₀)
+
+private lemma weight_pos_of_hnd
+    (i₀ : N) (w : (A → Real) → N → Real)
+    (hwind : ∀ vi₀ vi₀' i, i ≠ i₀ → w vi₀ i = w vi₀' i)
+    (hnd : ∃ i, i ≠ i₀ ∧ ∃ vi₀, 0 < w vi₀ i) :
+    ∃ j, j ≠ i₀ ∧ ∀ vi₀, 0 < w vi₀ j := by
+  obtain ⟨j, hj, vi₀star, hpos⟩ := hnd
+  refine ⟨j, hj, ?_⟩
+  intro vi₀
+  rw [hwind vi₀ vi₀star j hj]
+  exact hpos
+
+private lemma slice_force_via_j
+    (f : Valuation N A → A)
+    (i₀ j : N) (hj : j ≠ i₀)
+    (w : (A → Real) → N → Real) (k : (A → Real) → A → Real)
+    (hrep : ∀ vi₀ : A → Real,
+      (∀ i, 0 ≤ w vi₀ i) ∧
+      (∀ v a, affineScore (w vi₀) (k vi₀) v (slice f i₀ vi₀ v) ≥
+        affineScore (w vi₀) (k vi₀) v a))
+    (hpos : ∀ vi₀, 0 < w vi₀ j)
+    (vi₀ : A → Real) (target : A) :
+    ∃ v : Valuation N A, slice f i₀ vi₀ v = target := by
+  classical
+  -- The sum bounds every individual absolute offset difference, so this
+  -- finite value makes target strictly beat every other alternative.
+  let B : Real := Finset.univ.sum (fun a => |k vi₀ target - k vi₀ a|)
+  have hB : 0 ≤ B := by
+    dsimp [B]
+    exact Finset.sum_nonneg (fun _ _ => abs_nonneg _)
+  let M : Real := (B + 1) / w vi₀ j
+  have hM : w vi₀ j * M = B + 1 := by
+    dsimp [M]
+    rw [mul_comm]
+    exact div_mul_cancel₀ _ (ne_of_gt (hpos vi₀))
+  let v : Valuation N A :=
+    fun i x => if i = j then if x = target then M else 0 else 0
+  refine ⟨v, ?_⟩
+  have htarget : affineScore (w vi₀) (k vi₀) v target =
+      w vi₀ j * M + k vi₀ target := by
+    simp [affineScore, v]
+  have hforce : ∀ a, a ≠ target →
+      affineScore (w vi₀) (k vi₀) v target >
+        affineScore (w vi₀) (k vi₀) v a := by
+    intro a ha
+    have hother : affineScore (w vi₀) (k vi₀) v a = k vi₀ a := by
+      simp [affineScore, v, ha]
+    have hbound : |k vi₀ target - k vi₀ a| ≤ B := by
+      dsimp [B]
+      exact Finset.single_le_sum (f := fun x => |k vi₀ target - k vi₀ x|)
+        (fun x _ => abs_nonneg (k vi₀ target - k vi₀ x)) (Finset.mem_univ a)
+    rw [htarget, hother, hM]
+    have hneg := neg_abs_le (k vi₀ target - k vi₀ a)
+    linarith
+  by_contra hne
+  have hstrict := hforce (slice f i₀ vi₀ v) hne
+  have hmax := (hrep vi₀).2 v target
+  linarith
+
+namespace FixedAgentOffsetHelpers
+
+private def bumpVal (vi₀ : A → Real) (c : A) (t : Real) : A → Real :=
+  fun x => vi₀ x + if x = c then t else 0
+
+private lemma bumpVal_apply_ne (vi₀ : A → Real) (c x : A) (t : Real)
+    (h : x ≠ c) :
+    bumpVal vi₀ c t x = vi₀ x := by
+  unfold bumpVal
+  rw [if_neg h]
+  ring
+
+private lemma bumpVal_add (vi₀ : A → Real) (c : A) (s t : Real) :
+    bumpVal (bumpVal vi₀ c s) c t = bumpVal vi₀ c (s + t) := by
+  funext x
+  change (vi₀ x + (if x = c then s else 0)) + (if x = c then t else 0) =
+    vi₀ x + (if x = c then s + t else 0)
+  by_cases hx : x = c
+  · simp only [if_pos hx]
+    ring
+  · simp only [if_neg hx]
+    ring
+
+end FixedAgentOffsetHelpers
+
+private lemma weights_eq_of_pos_bump
+    (f : Valuation N A → A) (hsmon : IsSMon f)
+    (i₀ : N) (w : (A → Real) → N → Real) (k : (A → Real) → A → Real)
+    (hrep : ∀ vi₀ : A → Real,
+      (∀ i, 0 ≤ w vi₀ i) ∧
+      (∀ v a, affineScore (w vi₀) (k vi₀) v (slice f i₀ vi₀ v) ≥
+        affineScore (w vi₀) (k vi₀) v a))
+    (hnorm : ∀ vi₀ : A → Real,
+      Finset.univ.sum (fun i => w vi₀ i) = 1)
+    (hA : 3 ≤ Fintype.card A)
+    (vi₀ : A → Real) (c : A) (eps : Real) (heps : 0 < eps) :
+    w (FixedAgentOffsetHelpers.bumpVal vi₀ c eps) = w vi₀ := by
+  classical
+  let vi₀' : A → Real := FixedAgentOffsetHelpers.bumpVal vi₀ c eps
+  have hkey : ∀ v a b, slice f i₀ vi₀ v = a →
+      slice f i₀ vi₀' v = b → a ≠ b → b = c := by
+    intro v a b ha hb hab
+    have hgap := hsmon i₀ v vi₀ vi₀' a b hab
+      (by simpa [slice] using ha) (by simpa [slice] using hb)
+    have hgap' : vi₀ a - vi₀ b >
+        (vi₀ a + (if a = c then eps else 0)) -
+          (vi₀ b + (if b = c then eps else 0)) := by
+      simpa [vi₀', FixedAgentOffsetHelpers.bumpVal] using hgap
+    have hpositive :
+        (if b = c then eps else 0) - (if a = c then eps else 0) > 0 := by
+      linarith
+    by_contra hbnot
+    by_cases hac : a = c
+    · simp [hbnot, hac] at hpositive
+      linarith
+    · simp [hbnot, hac] at hpositive
+  have hcard : 1 < Fintype.card A := by omega
+  obtain ⟨altB, haltB⟩ := Fintype.exists_ne_of_one_lt_card hcard c
+  obtain ⟨altA, haltA⟩ := Fintype.exists_ne_of_one_lt_card hcard altB
+  let Tprime : Real := k vi₀' altB - k vi₀' altA
+  let T : Real := k vi₀ altB - k vi₀ altA
+  have hinclusion : ∀ z : N → Real,
+      Finset.univ.sum (fun i => w vi₀' i * z i) < Tprime →
+        Finset.univ.sum (fun i => w vi₀ i * z i) ≤ T := by
+    intro z hz
+    let p : N → Real := fun i => max (z i) 0
+    let q : N → Real := fun i => max (-z i) 0
+    have hpq : ∀ i, p i - q i = z i := by
+      intro i
+      dsimp [p, q]
+      by_cases hzi : z i ≤ 0
+      · rw [max_eq_right hzi, max_eq_left (neg_nonneg.mpr hzi)]
+        simp
+      · have hzi' : 0 ≤ z i := le_of_not_ge hzi
+        rw [max_eq_left hzi', max_eq_right (neg_nonpos.mpr hzi')]
+        simp
+    let P : Real := Finset.univ.sum (fun i => w vi₀' i * p i)
+    let Q : Real := Finset.univ.sum (fun i => w vi₀' i * q i)
+    let M : Real :=
+      (Finset.univ.sum (fun d => |k vi₀' d - k vi₀' altB - Q|)) + 1
+    let v : Valuation N A := fun i x =>
+      if x = altA then p i else if x = altB then q i else -M
+    have haltBneA : altB ≠ altA := Ne.symm haltA
+    have hvA : ∀ i, v i altA = p i := by
+      intro i
+      simp [v]
+    have hvB : ∀ i, v i altB = q i := by
+      intro i
+      simp [v, haltBneA]
+    have hqp (ww : N → Real) :
+        Finset.univ.sum (fun i => ww i * q i) -
+            Finset.univ.sum (fun i => ww i * p i) =
+          -(Finset.univ.sum (fun i => ww i * z i)) := by
+      calc
+        Finset.univ.sum (fun i => ww i * q i) -
+            Finset.univ.sum (fun i => ww i * p i) =
+              Finset.univ.sum (fun i => ww i * q i - ww i * p i) := by
+                rw [Finset.sum_sub_distrib]
+        _ = Finset.univ.sum (fun i => -(ww i * z i)) := by
+          apply Finset.sum_congr rfl
+          intro i hi
+          have hqi : q i - p i = -z i := by linarith [hpq i]
+          calc
+            ww i * q i - ww i * p i = ww i * (q i - p i) := by ring
+            _ = ww i * (-z i) := by rw [hqi]
+            _ = -(ww i * z i) := by ring
+        _ = -(Finset.univ.sum (fun i => ww i * z i)) := by
+          rw [Finset.sum_neg_distrib]
+    have hQminusP : Q - P = -(Finset.univ.sum (fun i => w vi₀' i * z i)) := by
+      simpa [Q, P] using hqp (w vi₀')
+    have hMbound (d : A) : k vi₀' d - k vi₀' altB - Q < M := by
+      have hsingle : |k vi₀' d - k vi₀' altB - Q| ≤
+          Finset.univ.sum (fun x => |k vi₀' x - k vi₀' altB - Q|) := by
+        exact Finset.single_le_sum
+          (f := fun x => |k vi₀' x - k vi₀' altB - Q|)
+          (fun x hx => abs_nonneg (k vi₀' x - k vi₀' altB - Q))
+          (Finset.mem_univ d)
+      dsimp [M]
+      have habs := le_abs_self (k vi₀' d - k vi₀' altB - Q)
+      linarith
+    have hscoreB : affineScore (w vi₀') (k vi₀') v altB = Q + k vi₀' altB := by
+      simp only [affineScore, hvB, Q]
+    have hscoreA : affineScore (w vi₀') (k vi₀') v altA = P + k vi₀' altA := by
+      simp only [affineScore, hvA, P]
+    have hBgtA : affineScore (w vi₀') (k vi₀') v altB >
+        affineScore (w vi₀') (k vi₀') v altA := by
+      have hgap : (Q + k vi₀' altB) - (P + k vi₀' altA) =
+          Tprime - Finset.univ.sum (fun i => w vi₀' i * z i) := by
+        dsimp [Q, P, Tprime]
+        calc
+          (Finset.univ.sum (fun i => w vi₀' i * q i) + k vi₀' altB) -
+              (Finset.univ.sum (fun i => w vi₀' i * p i) + k vi₀' altA) =
+              (Finset.univ.sum (fun i => w vi₀' i * q i) -
+                Finset.univ.sum (fun i => w vi₀' i * p i)) +
+                  (k vi₀' altB - k vi₀' altA) := by ring
+          _ = k vi₀' altB - k vi₀' altA -
+              Finset.univ.sum (fun i => w vi₀' i * z i) := by
+                rw [hqp (w vi₀')]
+                ring
+      rw [hscoreB, hscoreA]
+      linarith
+    have hscoreD (d : A) (hda : d ≠ altA) (hdb : d ≠ altB) :
+        affineScore (w vi₀') (k vi₀') v d = -M + k vi₀' d := by
+      have hvD : ∀ i, v i d = -M := by
+        intro i
+        simp [v, hda, hdb]
+      have hsumD : Finset.univ.sum (fun i => w vi₀' i * v i d) = -M := by
+        calc
+          Finset.univ.sum (fun i => w vi₀' i * v i d) =
+              Finset.univ.sum (fun i => w vi₀' i * (-M)) := by
+                apply Finset.sum_congr rfl
+                intro i hi
+                rw [hvD i]
+          _ = (Finset.univ.sum (fun i => w vi₀' i)) * (-M) := by
+            exact (Finset.sum_mul Finset.univ (fun i => w vi₀' i) (-M)).symm
+          _ = -M := by rw [hnorm vi₀']; ring
+      unfold affineScore
+      rw [hsumD]
+    have hBgtD (d : A) (hda : d ≠ altA) (hdb : d ≠ altB) :
+        affineScore (w vi₀') (k vi₀') v altB >
+          affineScore (w vi₀') (k vi₀') v d := by
+      rw [hscoreB, hscoreD d hda hdb]
+      have hMb := hMbound d
+      linarith
+    have hbumpwin : slice f i₀ vi₀' v = altB := by
+      by_contra hneB
+      have hmax := (hrep vi₀').2 v altB
+      have hstrict : affineScore (w vi₀') (k vi₀') v altB >
+          affineScore (w vi₀') (k vi₀') v (slice f i₀ vi₀' v) := by
+        by_cases hsa : slice f i₀ vi₀' v = altA
+        · rw [hsa]
+          exact hBgtA
+        · exact hBgtD (slice f i₀ vi₀' v) hsa hneB
+      linarith
+    have hsource : slice f i₀ vi₀ v = altB := by
+      by_contra hsource
+      have hc := hkey v (slice f i₀ vi₀ v) altB rfl hbumpwin hsource
+      exact haltB hc
+    have hscoreOldB : affineScore (w vi₀) (k vi₀) v altB =
+        Finset.univ.sum (fun i => w vi₀ i * q i) + k vi₀ altB := by
+      simp only [affineScore, hvB]
+    have hscoreOldA : affineScore (w vi₀) (k vi₀) v altA =
+        Finset.univ.sum (fun i => w vi₀ i * p i) + k vi₀ altA := by
+      simp only [affineScore, hvA]
+    have holdmax := (hrep vi₀).2 v altA
+    rw [hsource, hscoreOldB, hscoreOldA] at holdmax
+    have hqpOld := hqp (w vi₀)
+    have hgapOld :
+        (Finset.univ.sum (fun i => w vi₀ i * q i) + k vi₀ altB) -
+          (Finset.univ.sum (fun i => w vi₀ i * p i) + k vi₀ altA) =
+            T - Finset.univ.sum (fun i => w vi₀ i * z i) := by
+      dsimp [T]
+      calc
+        (Finset.univ.sum (fun i => w vi₀ i * q i) + k vi₀ altB) -
+            (Finset.univ.sum (fun i => w vi₀ i * p i) + k vi₀ altA) =
+            (Finset.univ.sum (fun i => w vi₀ i * q i) -
+              Finset.univ.sum (fun i => w vi₀ i * p i)) +
+                (k vi₀ altB - k vi₀ altA) := by ring
+        _ = k vi₀ altB - k vi₀ altA -
+            Finset.univ.sum (fun i => w vi₀ i * z i) := by
+              rw [hqpOld]
+              ring
+    linarith
+  have hthreshold : ∀ z₀ : N → Real,
+      0 < Finset.univ.sum (fun i => (-w vi₀' i) * z₀ i) →
+        0 ≤ Finset.univ.sum (fun i => (-w vi₀ i) * z₀ i) := by
+    intro z₀ hz
+    by_contra hnot
+    let Aold : Real := Finset.univ.sum (fun i => w vi₀ i * z₀ i)
+    let Aprime : Real := Finset.univ.sum (fun i => w vi₀' i * z₀ i)
+    have hnegdot (ww : N → Real) :
+        Finset.univ.sum (fun i => (-ww i) * z₀ i) =
+          -(Finset.univ.sum (fun i => ww i * z₀ i)) := by
+      calc
+        Finset.univ.sum (fun i => (-ww i) * z₀ i) =
+            Finset.univ.sum (fun i => -(ww i * z₀ i)) := by
+              apply Finset.sum_congr rfl
+              intro i hi
+              ring
+        _ = -(Finset.univ.sum (fun i => ww i * z₀ i)) := by
+          rw [Finset.sum_neg_distrib]
+    have hApos : 0 < Aold := by
+      have hneg : Finset.univ.sum (fun i => (-w vi₀ i) * z₀ i) < 0 :=
+        lt_of_not_ge hnot
+      rw [hnegdot (w vi₀)] at hneg
+      linarith
+    have hAprimeNeg : Aprime < 0 := by
+      rw [hnegdot (w vi₀')] at hz
+      change 0 < -Aprime at hz
+      linarith
+    let tau : Real := 1 + |T| / Aold + |Tprime| / (-Aprime)
+    have hdivA : 0 ≤ |T| / Aold := div_nonneg (abs_nonneg _) (le_of_lt hApos)
+    have hdivAprime : 0 ≤ |Tprime| / (-Aprime) :=
+      div_nonneg (abs_nonneg _) (le_of_lt (by linarith))
+    have htauA : |T| / Aold < tau := by
+      dsimp [tau]
+      linarith
+    have htauPrime : |Tprime| / (-Aprime) < tau := by
+      dsimp [tau]
+      linarith
+    have hlargeA : |T| < tau * Aold := by
+      have hmul := mul_lt_mul_of_pos_right htauA hApos
+      have hcancel := div_mul_cancel₀ |T| (ne_of_gt hApos)
+      nlinarith
+    have hlargePrime : |Tprime| < tau * (-Aprime) := by
+      have hden : 0 < -Aprime := by linarith
+      have hmul := mul_lt_mul_of_pos_right htauPrime hden
+      have hcancel := div_mul_cancel₀ |Tprime| (ne_of_gt hden)
+      nlinarith
+    let z₁ : N → Real := fun i => tau * z₀ i
+    have hscalePrime : Finset.univ.sum (fun i => w vi₀' i * z₁ i) =
+        tau * Aprime := by
+      calc
+        Finset.univ.sum (fun i => w vi₀' i * z₁ i) =
+            Finset.univ.sum (fun i => tau * (w vi₀' i * z₀ i)) := by
+              apply Finset.sum_congr rfl
+              intro i hi
+              dsimp [z₁]
+              ring
+        _ = tau * Finset.univ.sum (fun i => w vi₀' i * z₀ i) := by
+          exact (Finset.mul_sum Finset.univ
+            (fun i => w vi₀' i * z₀ i) tau).symm
+        _ = tau * Aprime := by rfl
+    have hz₁ : Finset.univ.sum (fun i => w vi₀' i * z₁ i) < Tprime := by
+      rw [hscalePrime]
+      have hnegT : -|Tprime| ≤ Tprime := neg_abs_le Tprime
+      nlinarith
+    have hinc := hinclusion z₁ hz₁
+    have hscaleOld : Finset.univ.sum (fun i => w vi₀ i * z₁ i) =
+        tau * Aold := by
+      calc
+        Finset.univ.sum (fun i => w vi₀ i * z₁ i) =
+            Finset.univ.sum (fun i => tau * (w vi₀ i * z₀ i)) := by
+              apply Finset.sum_congr rfl
+              intro i hi
+              dsimp [z₁]
+              ring
+        _ = tau * Finset.univ.sum (fun i => w vi₀ i * z₀ i) := by
+          exact (Finset.mul_sum Finset.univ
+            (fun i => w vi₀ i * z₀ i) tau).symm
+        _ = tau * Aold := by rfl
+    rw [hscaleOld] at hinc
+    have habsT : T ≤ |T| := le_abs_self T
+    linarith
+  have hu'ne : (fun i => -w vi₀' i) ≠ 0 := by
+    intro hzero
+    have hwzero : w vi₀' = 0 := by
+      funext i
+      have hi : -w vi₀' i = 0 := by simpa using congrFun hzero i
+      exact neg_eq_zero.mp hi
+    have hsumzero : Finset.univ.sum (fun i => w vi₀' i) = 0 := by
+      simp [hwzero]
+    have hone := hnorm vi₀'
+    rw [hsumzero] at hone
+    norm_num at hone
+  obtain ⟨alpha, halpha, hscaled⟩ :=
+    halfspace_homog (fun i => -w vi₀ i) (fun i => -w vi₀' i) hu'ne hthreshold
+  have hweights : ∀ i, w vi₀ i = alpha * w vi₀' i := by
+    intro i
+    have hi := hscaled i
+    linarith
+  have hsum : Finset.univ.sum (fun i => w vi₀ i) =
+      alpha * Finset.univ.sum (fun i => w vi₀' i) := by
+    calc
+      Finset.univ.sum (fun i => w vi₀ i) =
+          Finset.univ.sum (fun i => alpha * w vi₀' i) := by
+            apply Finset.sum_congr rfl
+            intro i hi
+            rw [hweights i]
+      _ = alpha * Finset.univ.sum (fun i => w vi₀' i) := by
+        exact (Finset.mul_sum Finset.univ (fun i => w vi₀' i) alpha).symm
+  have halphaone : alpha = 1 := by
+    rw [hnorm vi₀, hnorm vi₀'] at hsum
+    nlinarith
+  funext i
+  rw [hweights i, halphaone]
+  ring
+
+private lemma weights_eq_upper
+    (f : Valuation N A → A) (hsmon : IsSMon f)
+    (i₀ : N) (w : (A → Real) → N → Real) (k : (A → Real) → A → Real)
+    (hrep : ∀ vi₀ : A → Real,
+      (∀ i, 0 ≤ w vi₀ i) ∧
+      (∀ v a, affineScore (w vi₀) (k vi₀) v (slice f i₀ vi₀ v) ≥
+        affineScore (w vi₀) (k vi₀) v a))
+    (hnorm : ∀ vi₀ : A → Real,
+      Finset.univ.sum (fun i => w vi₀ i) = 1)
+    (hA : 3 ≤ Fintype.card A)
+    (base u : A → Real) (hle : ∀ a, base a ≤ u a) :
+    w u = w base := by
+  classical
+  have hclaim (s : Finset A) :
+      w (fun a => if a ∈ s then u a else base a) = w base := by
+    induction s using Finset.induction with
+    | empty =>
+        have heq : (fun a => if a ∈ (∅ : Finset A) then u a else base a) = base := by
+          funext a
+          simp
+        rw [heq]
+    | @insert c t hc ih =>
+        let vt : A → Real := fun a => if a ∈ t then u a else base a
+        have hsplit : (fun a => if a ∈ insert c t then u a else base a) =
+            FixedAgentOffsetHelpers.bumpVal vt c (u c - base c) := by
+          funext a
+          by_cases hac : a = c
+          · subst a
+            simp [vt, FixedAgentOffsetHelpers.bumpVal, hc]
+          · simp [vt, FixedAgentOffsetHelpers.bumpVal, hac]
+        by_cases hdelta : u c - base c = 0
+        · have hbumpeq :
+              FixedAgentOffsetHelpers.bumpVal vt c (u c - base c) = vt := by
+            funext a
+            simp [FixedAgentOffsetHelpers.bumpVal, hdelta]
+          rw [hsplit, hbumpeq]
+          exact ih
+        · have hnonneg : 0 ≤ u c - base c := by linarith [hle c]
+          have hpos : 0 < u c - base c :=
+            lt_of_le_of_ne hnonneg (Ne.symm hdelta)
+          have hbump := weights_eq_of_pos_bump f hsmon i₀ w k hrep hnorm hA
+            vt c (u c - base c) hpos
+          rw [hsplit]
+          exact hbump.trans ih
+  have huniv := hclaim Finset.univ
+  have heq : (fun a => if a ∈ Finset.univ then u a else base a) = u := by
+    funext a
+    simp
+  rw [heq] at huniv
+  exact huniv
 
 /-- Lemma 9 (Dobzinski-Nisan, weight independence): in the induction step for n ≥ 3,
     the affine weights of the sliced (n-1)-agent problems do not depend on the fixed
@@ -30,12 +624,253 @@ lemma weights_independent_of_fixed_agent
     (hnorm : ∀ vi₀ : A → Real,
       Finset.univ.sum (fun i => w vi₀ i) = 1) :
     ∀ vi₀ vi₀' i, i ≠ i₀ → w vi₀ i = w vi₀' i := by
-  /-
-  Normalization removes the positive scaling ambiguity. The uniqueness proof
-  still needs the full threshold argument for affine maximizers over an
-  unrestricted domain.
-  -/
-  sorry
+  classical
+  intro vi₀ vi₀' i hi
+  let u : A → Real := fun a => max (vi₀ a) (vi₀' a) + 1
+  have hle₁ : ∀ a, vi₀ a ≤ u a := by
+    intro a
+    dsimp [u]
+    have hmax := le_max_left (vi₀ a) (vi₀' a)
+    linarith
+  have hle₂ : ∀ a, vi₀' a ≤ u a := by
+    intro a
+    dsimp [u]
+    have hmax := le_max_left (vi₀' a) (vi₀ a)
+    rw [max_comm] at hmax
+    linarith
+  have hupper₁ := weights_eq_upper f hsmon i₀ w k hrep hnorm hA vi₀ u hle₁
+  have hupper₂ := weights_eq_upper f hsmon i₀ w k hrep hnorm hA vi₀' u hle₂
+  have hweights : w vi₀ = w vi₀' := hupper₁.symm.trans hupper₂
+  rw [hweights]
+
+private lemma affineScore_update_input_bump_diff
+    (weights : N → Real) (offset : A → Real) (v : Valuation N A)
+    (i₀ : N) (a b : A) (t : Real) (hab : a ≠ b) :
+    affineScore weights offset
+        (Function.update v i₀ (fun x => v i₀ x + if x = a then t else 0)) a -
+      affineScore weights offset
+        (Function.update v i₀ (fun x => v i₀ x + if x = a then t else 0)) b =
+    (affineScore weights offset v a - affineScore weights offset v b) + weights i₀ * t := by
+  classical
+  have hsumA :
+      (Finset.univ.sum fun i => weights i *
+          (Function.update v i₀ (fun x => v i₀ x + if x = a then t else 0)) i a) =
+        (Finset.univ.sum fun i => weights i * v i a) + weights i₀ * t := by
+    have hterm : ∀ i, weights i *
+        (Function.update v i₀ (fun x => v i₀ x + if x = a then t else 0)) i a =
+          weights i * v i a + (if i = i₀ then weights i₀ * t else 0) := by
+      intro i
+      by_cases hi : i = i₀
+      · subst i
+        simp only [Function.update_self, if_pos]
+        ring
+      · simp [Function.update_of_ne hi, hi]
+    calc
+      _ = Finset.univ.sum (fun i =>
+          weights i * v i a + (if i = i₀ then weights i₀ * t else 0)) := by
+            apply Finset.sum_congr rfl
+            intro i _
+            exact hterm i
+      _ = (Finset.univ.sum fun i => weights i * v i a) + weights i₀ * t := by
+        rw [Finset.sum_add_distrib]
+        have hite : Finset.univ.sum
+            (fun i : N => if i = i₀ then weights i₀ * t else 0) = weights i₀ * t := by
+          rw [Finset.sum_eq_single i₀]
+          · simp
+          · intro i hi hne
+            simp [hne]
+          · simp
+        rw [hite]
+  have hsumB :
+      (Finset.univ.sum fun i => weights i *
+          (Function.update v i₀ (fun x => v i₀ x + if x = a then t else 0)) i b) =
+        Finset.univ.sum (fun i => weights i * v i b) := by
+    apply Finset.sum_congr rfl
+    intro i _
+    by_cases hi : i = i₀
+    · subst i
+      simp only [Function.update_self, if_neg (Ne.symm hab)]
+      ring
+    · simp [Function.update_of_ne hi]
+  unfold affineScore
+  rw [hsumA, hsumB]
+  ring
+
+private def onlyAgentProfile (j : N) (z : A → Real) : Valuation N A :=
+  fun i a => if i = j then z a else 0
+
+private lemma affineScore_onlyAgentProfile
+    (weights : N → Real) (offset : A → Real) (j : N)
+    (z : A → Real) (a : A) :
+    affineScore weights offset (onlyAgentProfile j z) a =
+      weights j * z a + offset a := by
+  classical
+  unfold affineScore onlyAgentProfile
+  have hsum : Finset.univ.sum
+      (fun i => weights i * (if i = j then z a else 0)) = weights j * z a := by
+    rw [Finset.sum_eq_single j]
+    · simp
+    · intro i hi hne
+      simp [hne]
+    · simp
+  rw [hsum]
+
+private lemma pair_offset_order_of_fixed_smon
+    (f : Valuation N A → A) (hsmon : IsSMon f) (i₀ j : N) (hj : j ≠ i₀)
+    (w : (A → Real) → N → Real) (k : (A → Real) → A → Real)
+    (hrep : ∀ vi₀ : A → Real,
+      (∀ i, 0 ≤ w vi₀ i) ∧
+      (∀ v a, affineScore (w vi₀) (k vi₀) v (slice f i₀ vi₀ v) ≥
+        affineScore (w vi₀) (k vi₀) v a))
+    (hwind : ∀ vi₀ vi₀' i, i ≠ i₀ → w vi₀ i = w vi₀' i)
+    (hpos : ∀ vi₀, 0 < w vi₀ j)
+    (vi₀ vi₀' : A → Real) (a b : A) (hab : a ≠ b)
+    (hT : k vi₀ a - k vi₀ b > k vi₀' a - k vi₀' b) :
+    vi₀ a - vi₀ b > vi₀' a - vi₀' b := by
+  classical
+  let W : Real := w vi₀ j
+  let T : Real := k vi₀ a - k vi₀ b
+  let T' : Real := k vi₀' a - k vi₀' b
+  let r : Real := -(T + T') / (2 * W)
+  let D : Real := |W * r| + |k vi₀ a| + |k vi₀ b| + |k vi₀' a| + |k vi₀' b|
+  let z : A → Real := fun c =>
+    if c = a then r else if c = b then 0 else
+      -(D + |k vi₀ c| + |k vi₀' c| + 1) / W
+  let v : Valuation N A := onlyAgentProfile j z
+  have hWpos : 0 < W := hpos vi₀
+  have hWne : W ≠ 0 := ne_of_gt hWpos
+  have hW' : w vi₀' j = W := by
+    dsimp [W]
+    exact hwind vi₀' vi₀ j hj
+  have hWr : W * r = -(T + T') / 2 := by
+    dsimp [r]
+    field_simp [hWne]
+  have hza : z a = r := by simp [z]
+  have hzb : z b = 0 := by simp [z, Ne.symm hab]
+  have hpa : affineScore (w vi₀) (k vi₀) v a = W * r + k vi₀ a := by
+    rw [affineScore_onlyAgentProfile, hza]
+  have hpb : affineScore (w vi₀) (k vi₀) v b = k vi₀ b := by
+    rw [affineScore_onlyAgentProfile, hzb]
+    simp [W]
+  have hqa : affineScore (w vi₀') (k vi₀') v a = W * r + k vi₀' a := by
+    rw [affineScore_onlyAgentProfile, hza, hW']
+  have hqb : affineScore (w vi₀') (k vi₀') v b = k vi₀' b := by
+    rw [affineScore_onlyAgentProfile, hzb, hW']
+    ring
+  have hpDiff :
+      affineScore (w vi₀) (k vi₀) v a - affineScore (w vi₀) (k vi₀) v b =
+        (T - T') / 2 := by
+    rw [hpa, hpb, hWr]
+    dsimp [T, T']
+    ring
+  have hqDiff :
+      affineScore (w vi₀') (k vi₀') v b - affineScore (w vi₀') (k vi₀') v a =
+        (T - T') / 2 := by
+    rw [hqa, hqb, hWr]
+    dsimp [T, T']
+    ring
+  have hmargin : 0 < (T - T') / 2 := by
+    apply div_pos
+    · exact sub_pos.mpr (by simpa [T, T'] using hT)
+    · norm_num
+  have hpaLower : -D ≤ affineScore (w vi₀) (k vi₀) v a := by
+    rw [hpa]
+    dsimp [D]
+    linarith [neg_abs_le (W * r), neg_abs_le (k vi₀ a),
+      abs_nonneg (k vi₀ b), abs_nonneg (k vi₀' a), abs_nonneg (k vi₀' b)]
+  have hpbLower : -D ≤ affineScore (w vi₀) (k vi₀) v b := by
+    rw [hpb]
+    dsimp [D]
+    linarith [neg_abs_le (k vi₀ b), abs_nonneg (W * r), abs_nonneg (k vi₀ a),
+      abs_nonneg (k vi₀' a), abs_nonneg (k vi₀' b)]
+  have hqaLower : -D ≤ affineScore (w vi₀') (k vi₀') v a := by
+    rw [hqa]
+    dsimp [D]
+    linarith [neg_abs_le (W * r), neg_abs_le (k vi₀' a),
+      abs_nonneg (k vi₀ a), abs_nonneg (k vi₀ b), abs_nonneg (k vi₀' b)]
+  have hqbLower : -D ≤ affineScore (w vi₀') (k vi₀') v b := by
+    rw [hqb]
+    dsimp [D]
+    linarith [neg_abs_le (k vi₀' b), abs_nonneg (W * r), abs_nonneg (k vi₀ a),
+      abs_nonneg (k vi₀ b), abs_nonneg (k vi₀' a)]
+  have hlow (c : A) (hca : c ≠ a) (hcb : c ≠ b) :
+      affineScore (w vi₀) (k vi₀) v c ≤ -D - 1 ∧
+        affineScore (w vi₀') (k vi₀') v c ≤ -D - 1 := by
+    have hzc : z c = -(D + |k vi₀ c| + |k vi₀' c| + 1) / W := by
+      simp [z, hca, hcb]
+    have hmulp : W * z c = -(D + |k vi₀ c| + |k vi₀' c| + 1) := by
+      rw [hzc]
+      exact mul_div_cancel₀ _ hWne
+    have hmulq : w vi₀' j * z c =
+        -(D + |k vi₀ c| + |k vi₀' c| + 1) := by
+      rw [hW', hzc]
+      exact mul_div_cancel₀ _ hWne
+    constructor
+    · rw [affineScore_onlyAgentProfile, hmulp]
+      linarith [le_abs_self (k vi₀ c), abs_nonneg (k vi₀' c)]
+    · rw [affineScore_onlyAgentProfile, hmulq]
+      linarith [le_abs_self (k vi₀' c), abs_nonneg (k vi₀ c)]
+  have hstrict₀ : ∀ c, c ≠ a →
+      affineScore (w vi₀) (k vi₀) v a > affineScore (w vi₀) (k vi₀) v c := by
+    intro c hca
+    by_cases hcb : c = b
+    · subst c
+      linarith [hpDiff]
+    · have hc := (hlow c hca hcb).1
+      linarith [hpaLower]
+  have hstrict₀' : ∀ c, c ≠ b →
+      affineScore (w vi₀') (k vi₀') v b > affineScore (w vi₀') (k vi₀') v c := by
+    intro c hcb
+    by_cases hca : c = a
+    · subst c
+      linarith [hqDiff]
+    · have hc := (hlow c hca hcb).2
+      linarith [hqbLower]
+  have hwin₀ : slice f i₀ vi₀ v = a := by
+    by_contra hne
+    have hstrict := hstrict₀ (slice f i₀ vi₀ v) hne
+    have hmax := (hrep vi₀).2 v a
+    linarith
+  have hwin₀' : slice f i₀ vi₀' v = b := by
+    by_contra hne
+    have hstrict := hstrict₀' (slice f i₀ vi₀' v) hne
+    have hmax := (hrep vi₀').2 v b
+    linarith
+  exact hsmon i₀ v vi₀ vi₀' a b hab
+    (by simpa [slice] using hwin₀) (by simpa [slice] using hwin₀')
+
+private lemma pair_offset_eq_of_equal_gap
+    (f : Valuation N A → A) (hsmon : IsSMon f) (i₀ j : N) (hj : j ≠ i₀)
+    (w : (A → Real) → N → Real) (k : (A → Real) → A → Real)
+    (hrep : ∀ vi₀ : A → Real,
+      (∀ i, 0 ≤ w vi₀ i) ∧
+      (∀ v a, affineScore (w vi₀) (k vi₀) v (slice f i₀ vi₀ v) ≥
+        affineScore (w vi₀) (k vi₀) v a))
+    (hwind : ∀ vi₀ vi₀' i, i ≠ i₀ → w vi₀ i = w vi₀' i)
+    (hpos : ∀ vi₀, 0 < w vi₀ j)
+    (vi₀ vi₀' : A → Real) (a b : A) (hab : a ≠ b)
+    (hgap : vi₀ a - vi₀ b = vi₀' a - vi₀' b) :
+    k vi₀ a - k vi₀ b = k vi₀' a - k vi₀' b := by
+  by_contra hneq
+  rcases lt_or_gt_of_ne hneq with hlt | hgt
+  · have hrev := pair_offset_order_of_fixed_smon f hsmon i₀ j hj w k hrep hwind hpos
+      vi₀' vi₀ a b hab (by linarith)
+    linarith
+  · have hforw := pair_offset_order_of_fixed_smon f hsmon i₀ j hj w k hrep hwind hpos
+      vi₀ vi₀' a b hab hgt
+    linarith
+
+#check weight_pos_of_hnd
+#check slice_force_via_j
+#check FixedAgentOffsetHelpers.bumpVal_apply_ne
+#check FixedAgentOffsetHelpers.bumpVal_add
+#check affineScore_update_input_bump_diff
+#check affineScore_onlyAgentProfile
+#check pair_offset_order_of_fixed_smon
+#check pair_offset_eq_of_equal_gap
+#check additive_mono_linear
+#check Roberts.exists_ne_ne
+#check Fintype.exists_ne_of_one_lt_card
 
 /-- Lemma 10 (Dobzinski-Nisan, offset consistency): in the induction step for n ≥ 3,
     once weights are independent of the fixed agent's valuation, the offsets are
@@ -45,12 +880,14 @@ lemma weights_independent_of_fixed_agent
 lemma offsets_consistent_of_fixed_agent
     (f : Valuation N A → A) (hsmon : IsSMon f)
     (i₀ : N) (hveto : ∀ i, i ≠ i₀ → HasNoVetoPower f i)
+    (hA : 3 ≤ Fintype.card A)
     (w : (A → Real) → N → Real) (k : (A → Real) → A → Real)
     (hrep : ∀ vi₀ : A → Real,
       (∀ i, 0 ≤ w vi₀ i) ∧
       (∀ v a, affineScore (w vi₀) (k vi₀) v (slice f i₀ vi₀ v) ≥
         affineScore (w vi₀) (k vi₀) v a))
-    (hwind : ∀ vi₀ vi₀' i, i ≠ i₀ → w vi₀ i = w vi₀' i) :
+    (hwind : ∀ vi₀ vi₀' i, i ≠ i₀ → w vi₀ i = w vi₀' i)
+    (hnd : ∃ i, i ≠ i₀ ∧ ∃ vi₀, 0 < w vi₀ i) :
     ∃ α : Real, ∀ vi₀ vi₀' a b,
       (k vi₀ a - α * vi₀ a) - (k vi₀ b - α * vi₀ b) =
       (k vi₀' a - α * vi₀' a) - (k vi₀' b - α * vi₀' b) := by
@@ -62,7 +899,179 @@ lemma offsets_consistent_of_fixed_agent
   identified via the switching thresholds. The dictator case (where slices
   are constant) must be separated before applying this.
   -/
-  sorry
+  classical
+  obtain ⟨j, hj, hpos⟩ := weight_pos_of_hnd i₀ w hwind hnd
+  have _honto : ∀ vi₀ target, ∃ v, slice f i₀ vi₀ v = target := by
+    intro vi₀ target
+    exact slice_force_via_j f i₀ j hj w k hrep hpos vi₀ target
+  let gapProfile : A → Real → A → Real := fun a t c => if c = a then t else 0
+  let phi : A → A → Real → Real := fun a b t =>
+    k (gapProfile a t) a - k (gapProfile a t) b
+  let response : A → A → Real → Real := fun a b t => phi a b t - phi a b 0
+  have hrepr (x : A → Real) (a b : A) (hab : a ≠ b) :
+      k x a - k x b = phi a b (x a - x b) := by
+    have hgap : x a - x b = gapProfile a (x a - x b) a -
+        gapProfile a (x a - x b) b := by
+      simp [gapProfile, Ne.symm hab]
+    have heq := pair_offset_eq_of_equal_gap f hsmon i₀ j hj w k hrep hwind hpos
+      x (gapProfile a (x a - x b)) a b hab hgap
+    simpa [phi] using heq
+  have hphiTri (a b c : A) (hab : a ≠ b) (hbc : b ≠ c) (hac : a ≠ c)
+      (s t : Real) : phi a b s + phi b c t = phi a c (s + t) := by
+    let x : A → Real := fun d => if d = a then s + t else if d = b then t else 0
+    have hxa : x a = s + t := by simp [x]
+    have hxb : x b = t := by simp [x, Ne.symm hab]
+    have hxc : x c = 0 := by simp [x, Ne.symm hac, Ne.symm hbc]
+    have hgap₁ : x a - x b = s := by rw [hxa, hxb]; ring
+    have hgap₂ : x b - x c = t := by rw [hxb, hxc]; ring
+    have hgap₃ : x a - x c = s + t := by rw [hxa, hxc]; ring
+    have h₁ : phi a b s = k x a - k x b := by
+      rw [← hgap₁]
+      exact (hrepr x a b hab).symm
+    have h₂ : phi b c t = k x b - k x c := by
+      rw [← hgap₂]
+      exact (hrepr x b c hbc).symm
+    have h₃ : phi a c (s + t) = k x a - k x c := by
+      rw [← hgap₃]
+      exact (hrepr x a c hac).symm
+    calc
+      phi a b s + phi b c t = (k x a - k x b) + (k x b - k x c) := by rw [h₁, h₂]
+      _ = k x a - k x c := by ring
+      _ = phi a c (s + t) := h₃.symm
+  have hresponseTri (a b c : A) (hab : a ≠ b) (hbc : b ≠ c) (hac : a ≠ c)
+      (s t : Real) : response a b s + response b c t = response a c (s + t) := by
+    have h := hphiTri a b c hab hbc hac s t
+    have h0 := hphiTri a b c hab hbc hac 0 0
+    dsimp [response]
+    have hzero : phi a b 0 + phi b c 0 = phi a c 0 := by simpa using h0
+    calc
+      _ = (phi a b s + phi b c t) - (phi a b 0 + phi b c 0) := by ring
+      _ = phi a c (s + t) - phi a c 0 := by rw [h, hzero]
+      _ = _ := rfl
+  have hresponseABAC (a b c : A) (hab : a ≠ b) (hbc : b ≠ c) (hac : a ≠ c)
+      (t : Real) : response a b t = response a c t := by
+    have h := hresponseTri a b c hab hbc hac t 0
+    have hz : response b c 0 = 0 := by simp [response]
+    rw [hz, add_zero] at h
+    simpa using h
+  have hresponseBCAC (a b c : A) (hab : a ≠ b) (hbc : b ≠ c) (hac : a ≠ c)
+      (t : Real) : response b c t = response a c t := by
+    have h := hresponseTri a b c hab hbc hac 0 t
+    have hz : response a b 0 = 0 := by dsimp [response]; ring
+    rw [hz, zero_add] at h
+    simpa using h
+  obtain ⟨baseB⟩ := (inferInstance : Nonempty A)
+  have hcard : 1 < Fintype.card A := by omega
+  obtain ⟨baseA, hbaseA⟩ := Fintype.exists_ne_of_one_lt_card hcard baseB
+  let F : Real → Real := response baseA baseB
+  have hresponseFromRef (a : A) (ha : a ≠ baseB) (t : Real) :
+      response a baseB t = F t := by
+    by_cases haa : a = baseA
+    · subst a
+      rfl
+    · have h := hresponseBCAC a baseA baseB haa hbaseA ha t
+      dsimp [F]
+      exact h.symm
+  have hresponseReverse (a b : A) (hab : a ≠ b) (t : Real) :
+      response a b t = response b a t := by
+    obtain ⟨c, hca, hcb⟩ := Roberts.exists_ne_ne hab hA
+    have h₁ := hresponseABAC a b c hab (Ne.symm hcb) (Ne.symm hca) t
+    have h₂ := hresponseBCAC a b c hab (Ne.symm hcb) (Ne.symm hca) t
+    have h₃ := hresponseABAC b a c (Ne.symm hab) (Ne.symm hca) (Ne.symm hcb) t
+    calc
+      response a b t = response a c t := h₁
+      _ = response b c t := h₂.symm
+      _ = response b a t := h₃.symm
+  have hresponseCommon (a b : A) (hab : a ≠ b) (t : Real) :
+      response a b t = F t := by
+    by_cases hb : b = baseB
+    · subst b
+      exact hresponseFromRef a hab t
+    · by_cases ha : a = baseB
+      · subst a
+        calc
+          response baseB b t = response b baseB t := hresponseReverse baseB b hab t
+          _ = F t := hresponseFromRef b hb t
+      · calc
+          response a b t = response a baseB t :=
+            hresponseABAC a b baseB hab hb ha t
+          _ = F t := hresponseFromRef a ha t
+  have hphiMono (a b : A) (hab : a ≠ b) (s t : Real) (hst : s ≤ t) :
+      phi a b s ≤ phi a b t := by
+    by_contra hnot
+    have hT : phi a b s > phi a b t := lt_of_not_ge hnot
+    have hSgap : gapProfile a s a - gapProfile a s b = s := by
+      simp [gapProfile, Ne.symm hab]
+    have hTgap : gapProfile a t a - gapProfile a t b = t := by
+      simp [gapProfile, Ne.symm hab]
+    have hstrict := pair_offset_order_of_fixed_smon f hsmon i₀ j hj w k hrep hwind hpos
+      (gapProfile a s) (gapProfile a t) a b hab (by simpa [phi] using hT)
+    rw [hSgap, hTgap] at hstrict
+    linarith
+  have hresponseMono : ∀ δ γ : Real, δ ≥ γ → F δ ≥ F γ := by
+    intro δ γ hδγ
+    have h := hphiMono baseA baseB hbaseA γ δ hδγ
+    dsimp [F, response] at h ⊢
+    linarith
+  obtain ⟨third, hthirdA, hthirdB⟩ := Roberts.exists_ne_ne hbaseA hA
+  have hresponseAdd : ∀ s t : Real, F (s + t) = F s + F t := by
+    intro s t
+    have h := hresponseTri baseA baseB third hbaseA (Ne.symm hthirdB)
+      (Ne.symm hthirdA) s t
+    have hs := hresponseCommon baseA baseB hbaseA s
+    have ht := hresponseCommon baseB third (Ne.symm hthirdB) t
+    have hst := hresponseCommon baseA third (Ne.symm hthirdA) (s + t)
+    rw [hs, ht, hst] at h
+    linarith
+  let l : Real → Real := fun t => -F t
+  have hadd : ∀ δ γ : Real, l (δ + γ) = l δ + l γ := by
+    intro δ γ
+    dsimp [l]
+    rw [hresponseAdd]
+    ring
+  have hmono : ∀ δ γ : Real, δ ≥ γ → l δ ≤ l γ := by
+    intro δ γ hδγ
+    have h := hresponseMono δ γ hδγ
+    dsimp [l]
+    linarith
+  let α : Real := F 1
+  have hlinear : ∀ t : Real, F t = α * t := by
+    intro t
+    have h := additive_mono_linear hadd hmono t
+    dsimp [l, α] at h
+    linarith
+  refine ⟨α, ?_⟩
+  intro vi₀ vi₀' a b
+  by_cases hab : a = b
+  · subst b
+    ring
+  · have hleftRep := hrepr vi₀ a b hab
+    have hrightRep := hrepr vi₀' a b hab
+    have hleftPhi : phi a b (vi₀ a - vi₀ b) =
+        phi a b 0 + α * (vi₀ a - vi₀ b) := by
+      have h := hresponseCommon a b hab (vi₀ a - vi₀ b)
+      have hlin := hlinear (vi₀ a - vi₀ b)
+      dsimp [response] at h
+      rw [hlin] at h
+      linarith
+    have hrightPhi : phi a b (vi₀' a - vi₀' b) =
+        phi a b 0 + α * (vi₀' a - vi₀' b) := by
+      have h := hresponseCommon a b hab (vi₀' a - vi₀' b)
+      have hlin := hlinear (vi₀' a - vi₀' b)
+      dsimp [response] at h
+      rw [hlin] at h
+      linarith
+    have hleft : (k vi₀ a - α * vi₀ a) - (k vi₀ b - α * vi₀ b) = phi a b 0 := by
+      calc
+        _ = (k vi₀ a - k vi₀ b) - α * (vi₀ a - vi₀ b) := by ring
+        _ = phi a b (vi₀ a - vi₀ b) - α * (vi₀ a - vi₀ b) := by rw [hleftRep]
+        _ = phi a b 0 := by rw [hleftPhi]; ring
+    have hright : (k vi₀' a - α * vi₀' a) - (k vi₀' b - α * vi₀' b) = phi a b 0 := by
+      calc
+        _ = (k vi₀' a - k vi₀' b) - α * (vi₀' a - vi₀' b) := by ring
+        _ = phi a b (vi₀' a - vi₀' b) - α * (vi₀' a - vi₀' b) := by rw [hrightRep]
+        _ = phi a b 0 := by rw [hrightPhi]; ring
+    rw [hleft, hright]
 
 /-- Single-agent case (n = 1): DSIC + S-MON + onto implies affine maximizer.
     With a single agent, DSIC forces the choice function to maximize the agent's
@@ -449,9 +1458,11 @@ lemma tieBreak_onto (f : Valuation N A → A) (hwmon : IsWMon f)
 /-- Taxation converse (W-MON → DSIC payments): a weakly monotone choice
     function can be equipped with payments making it DSIC.
 
-    This is the standard Rochet-style taxation principle converse. Given
-    `IsWMon f`, the menu prices are well-defined (the `price` construction in
-    `Roberts.Taxation`), and the resulting mechanism satisfies DSIC.
+    Fixing the other reports, the proof anchors the menu at the outcome chosen
+    by the zero valuation and prices each alternative by the negative infimum
+    of its value gap over reports selecting that anchor. W-MON bounds these
+    infima, and a two-coordinate perturbation shows the selected outcome
+    maximizes utility at every report.
 
     NOTE (2026-09-27): This replaces the false `tieBreakMechanism_dsic`.
     Reusing the *original* mechanism's menu prices for tie-broken outcomes
@@ -462,14 +1473,170 @@ lemma tieBreak_onto (f : Valuation N A → A) (hwmon : IsWMon f)
     structure, not inherited from the original mechanism. -/
 lemma wmon_dsic_payments (f : Valuation N A → A) (hwmon : IsWMon f) :
     ∃ pay : Valuation N A → N → Real, IsDSIC ⟨f, pay⟩ := by
-  /-
-  Open: formalize the taxation-principle converse. The `price` construction
-  in `Roberts.Taxation` is defined from an existing mechanism's payments;
-  here the payments must be built from the choice function alone via the
-  critical-value / envelope construction, then shown to satisfy DSIC using
-  `IsWMon f`. This is independent of the other open sorries.
-  -/
-  sorry
+  classical
+  let zeroVal : A → Real := fun _ => 0
+  have updateEq (p : Valuation N A) (j : N) (w : A → Real) :
+      Function.update p j w =
+        @Function.update N (fun _ : N => A → Real) (Classical.decEq N) p j w := by
+    funext k
+    by_cases hk : k = j <;> simp [hk]
+  let baseProfile : Valuation N A → N → Valuation N A :=
+    fun v i => Function.update v i zeroVal
+  let menuCost : Valuation N A → N → A → Real := fun v i a =>
+    sInf {t : Real | ∃ w : A → Real,
+      f (Function.update (baseProfile v i) i w) = f (baseProfile v i) ∧
+        t = w (f (baseProfile v i)) - w a}
+  let pay : Valuation N A → N → Real := fun v i => -menuCost v i (f v)
+  refine ⟨pay, ?_⟩
+  unfold IsDSIC
+  intro i v vi2
+  let base := baseProfile v i
+  let K := f base
+  let g : (A → Real) → A := fun w => f (Function.update base i w)
+  let S : A → Set Real := fun a =>
+    {t | ∃ w : A → Real, g w = K ∧ t = w K - w a}
+  let d : A → Real := fun a => sInf (S a)
+  have hzero : g zeroVal = K := by
+    dsimp [g, K, base, baseProfile]
+    rw [Function.update_idem]
+  have htruthout : g (v i) = f v := by
+    dsimp [g, base, baseProfile]
+    rw [Function.update_idem, update_self v i]
+  have hdevout : g vi2 = f (Function.update v i vi2) := by
+    dsimp [g, base, baseProfile]
+    rw [Function.update_idem]
+  have hcost_eq : ∀ a, menuCost v i a = d a := by
+    intro a
+    rfl
+  have hbaseUpdate : baseProfile (Function.update v i vi2) i = base := by
+    dsimp [base, baseProfile]
+    rw [Function.update_idem]
+  have hcostUpdate : ∀ a,
+      menuCost (Function.update v i vi2) i a = menuCost v i a := by
+    intro a
+    dsimp [menuCost]
+    rw [hbaseUpdate]
+  have hnonempty : ∀ a, (S a).Nonempty := by
+    intro a
+    refine ⟨0, ?_⟩
+    change ∃ w : A → Real, g w = K ∧ 0 = w K - w a
+    exact ⟨zeroVal, hzero, by simp [zeroVal]⟩
+  have hdLower : ∀ a (u : A → Real), g u = a → u K - u a ≤ d a := by
+    intro a u hu
+    apply le_csInf (hnonempty a)
+    intro t ht
+    rcases ht with ⟨w, hw, rfl⟩
+    by_cases h : a = K
+    · simp [h]
+    · have hm : w K - w a ≥ u K - u a :=
+        hwmon i base w u K a (Ne.symm h) hw hu
+      exact hm
+  have hdUpper : ∀ a, (∃ u : A → Real, g u = a) →
+      ∀ w : A → Real, g w = K → d a ≤ w K - w a := by
+    intro a ha w hw
+    have hbelow : BddBelow (S a) := by
+      by_cases h : a = K
+      · refine ⟨0, ?_⟩
+        intro t ht
+        rcases ht with ⟨z, hz, rfl⟩
+        simp [h]
+      · obtain ⟨u, hu⟩ := ha
+        refine ⟨u K - u a, ?_⟩
+        intro t ht
+        rcases ht with ⟨z, hz, rfl⟩
+        have hm : z K - z a ≥ u K - u a :=
+          hwmon i base z u K a (Ne.symm h) hz hu
+        exact hm
+    change sInf (S a) ≤ w K - w a
+    apply csInf_le hbelow
+    change ∃ z : A → Real, g z = K ∧ w K - w a = z K - z a
+    exact ⟨w, hw, rfl⟩
+  have hdk : d K = 0 := by
+    have hlow := hdLower K zeroVal hzero
+    have hupp := hdUpper K ⟨zeroVal, hzero⟩ zeroVal hzero
+    simp [zeroVal] at hlow hupp
+    linarith
+  have hselected : ∀ x : A → Real, x (g x) + d (g x) ≥ x K := by
+    intro x
+    have h := hdLower (g x) x rfl
+    linarith
+  have hanchorBest : ∀ x : A → Real, ∀ b : A,
+      (∃ y : A → Real, g y = b) → g x = K →
+        x K ≥ x b + d b := by
+    intro x b hb hx
+    have h := hdUpper b hb x hx
+    linarith
+  have hmenuMax : ∀ x y : A → Real,
+      x (g x) + d (g x) ≥ x (g y) + d (g y) := by
+    intro x y
+    by_contra hnot
+    have hlt : x (g x) + d (g x) < x (g y) + d (g y) := by linarith
+    have hnotxK : g x ≠ K := by
+      intro hx
+      rw [hx, hdk] at hlt
+      have hbest := hanchorBest x (g y) ⟨y, rfl⟩ hx
+      linarith
+    have hnotyK : g y ≠ K := by
+      intro hy
+      rw [hy, hdk] at hlt
+      have hsel := hselected x
+      linarith
+    have hxy : g x ≠ g y := by
+      intro hxy
+      rw [hxy] at hlt
+      exact lt_irrefl _ hlt
+    let ε : Real := (x (g y) + d (g y) - (x (g x) + d (g x))) / 4
+    let γ : Real := (x (g x) + d (g x) - x K) + 2 * ε
+    have hε : 0 < ε := by dsimp [ε]; linarith
+    have hγgreater : ε < γ := by dsimp [γ]; linarith [hselected x]
+    have hleft : x (g x) + d (g x) + ε < x K + γ := by
+      dsimp [γ]
+      linarith
+    have hright : x K + γ < x (g y) + d (g y) := by
+      dsimp [γ, ε]
+      linarith
+    let z : A → Real := Function.update
+      (Function.update x K (x K + γ)) (g x) (x (g x) + ε)
+    have hza : z (g x) = x (g x) + ε := by simp [z]
+    have hzk : z K = x K + γ := by simp [z, Ne.symm hnotxK]
+    have hzy : z (g y) = x (g y) := by simp [z, hnotyK, Ne.symm hxy]
+    have hselectedZ : z (g z) + d (g z) ≥ z K := hselected z
+    have hnotza : g z ≠ g x := by
+      intro heq
+      rw [heq, hza, hzk] at hselectedZ
+      linarith
+    have hnotzK : g z ≠ K := by
+      intro heq
+      have hbest := hanchorBest z (g y) ⟨y, rfl⟩ heq
+      rw [hzk, hzy] at hbest
+      linarith
+    have hzz : z (g z) = x (g z) := by simp [z, hnotza, hnotzK]
+    have hmono : x (g x) - x (g z) ≥ z (g x) - z (g z) :=
+      hwmon i base x z (g x) (g z) (Ne.symm hnotza) rfl rfl
+    rw [hza, hzz] at hmono
+    linarith [hε]
+  have hcostUpdateD : ∀ a, menuCost (Function.update v i vi2) i a = d a := by
+    intro a
+    rw [hcostUpdate a, hcost_eq a]
+  have hptruth : pay v i = -d (g (v i)) := by
+    dsimp [pay]
+    rw [hcost_eq, htruthout]
+  have hpdev : pay (Function.update v i vi2) i = -d (g vi2) := by
+    dsimp [pay]
+    rw [hcostUpdateD, hdevout]
+  have hFdev : f (@Function.update N (fun _ : N => A → Real)
+      (Classical.decEq N) v i vi2) = g vi2 := by
+    calc
+      _ = f (Function.update v i vi2) := congrArg f (updateEq v i vi2).symm
+      _ = g vi2 := hdevout.symm
+  have hpdevClassical : pay
+      (@Function.update N (fun _ : N => A → Real) (Classical.decEq N) v i vi2) i =
+      -d (g vi2) := by
+    rw [(updateEq v i vi2).symm]
+    exact hpdev
+  simp only [Mechanism.choiceFn, Mechanism.pay]
+  rw [htruthout.symm, hFdev, hptruth, hpdevClassical]
+  linarith [hmenuMax (v i) vi2]
 
 /-- Roberts' theorem (M6 assembly): DSIC + onto implies affine maximizer. -/
 theorem roberts_theorem (hA : 3 ≤ Fintype.card A)
