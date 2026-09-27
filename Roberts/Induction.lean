@@ -877,10 +877,9 @@ private lemma pair_offset_eq_of_equal_gap
     consistent up to a common additive constant: k(vi₀) a - k(vi₀) b does not depend
     on vi₀. Uses S-MON and no-veto to transfer the affine representation across
     different fixed valuations of i₀. -/
-lemma offsets_consistent_of_fixed_agent
+private lemma offsets_consistent_of_fixed_agent_core
     (f : Valuation N A → A) (hsmon : IsSMon f)
-    (i₀ : N) (hveto : ∀ i, i ≠ i₀ → HasNoVetoPower f i)
-    (hA : 3 ≤ Fintype.card A)
+    (i₀ : N) (hA : 3 ≤ Fintype.card A)
     (w : (A → Real) → N → Real) (k : (A → Real) → A → Real)
     (hrep : ∀ vi₀ : A → Real,
       (∀ i, 0 ≤ w vi₀ i) ∧
@@ -888,7 +887,7 @@ lemma offsets_consistent_of_fixed_agent
         affineScore (w vi₀) (k vi₀) v a))
     (hwind : ∀ vi₀ vi₀' i, i ≠ i₀ → w vi₀ i = w vi₀' i)
     (hnd : ∃ i, i ≠ i₀ ∧ ∃ vi₀, 0 < w vi₀ i) :
-    ∃ α : Real, ∀ vi₀ vi₀' a b,
+    ∃ α : Real, 0 ≤ α ∧ ∀ vi₀ vi₀' a b,
       (k vi₀ a - α * vi₀ a) - (k vi₀ b - α * vi₀ b) =
       (k vi₀' a - α * vi₀' a) - (k vi₀' b - α * vi₀' b) := by
   /-
@@ -1040,7 +1039,12 @@ lemma offsets_consistent_of_fixed_agent
     have h := additive_mono_linear hadd hmono t
     dsimp [l, α] at h
     linarith
-  refine ⟨α, ?_⟩
+  have hαnonneg : 0 ≤ α := by
+    have h := hresponseMono 1 0 (by norm_num)
+    have hFzero : F 0 = 0 := by simp [F, response]
+    dsimp [α]
+    linarith
+  refine ⟨α, hαnonneg, ?_⟩
   intro vi₀ vi₀' a b
   by_cases hab : a = b
   · subst b
@@ -1072,6 +1076,27 @@ lemma offsets_consistent_of_fixed_agent
         _ = phi a b (vi₀' a - vi₀' b) - α * (vi₀' a - vi₀' b) := by rw [hrightRep]
         _ = phi a b 0 := by rw [hrightPhi]; ring
     rw [hleft, hright]
+
+/-- Lemma 10 (Dobzinski-Nisan, offset consistency), with its original
+    no-veto hypotheses. The proof only needs the affine slice representations,
+    their weight independence, and a positive weight away from the fixed agent. -/
+lemma offsets_consistent_of_fixed_agent
+    (f : Valuation N A → A) (hsmon : IsSMon f)
+    (i₀ : N) (hveto : ∀ i, i ≠ i₀ → HasNoVetoPower f i)
+    (hA : 3 ≤ Fintype.card A)
+    (w : (A → Real) → N → Real) (k : (A → Real) → A → Real)
+    (hrep : ∀ vi₀ : A → Real,
+      (∀ i, 0 ≤ w vi₀ i) ∧
+      (∀ v a, affineScore (w vi₀) (k vi₀) v (slice f i₀ vi₀ v) ≥
+        affineScore (w vi₀) (k vi₀) v a))
+    (hwind : ∀ vi₀ vi₀' i, i ≠ i₀ → w vi₀ i = w vi₀' i)
+    (hnd : ∃ i, i ≠ i₀ ∧ ∃ vi₀, 0 < w vi₀ i) :
+    ∃ α : Real, ∀ vi₀ vi₀' a b,
+      (k vi₀ a - α * vi₀ a) - (k vi₀ b - α * vi₀ b) =
+      (k vi₀' a - α * vi₀' a) - (k vi₀' b - α * vi₀' b) := by
+  obtain ⟨alpha, _, hoff⟩ :=
+    offsets_consistent_of_fixed_agent_core f hsmon i₀ hA w k hrep hwind hnd
+  exact ⟨alpha, hoff⟩
 
 /-- Single-agent case (n = 1): DSIC + S-MON + onto implies affine maximizer.
     With a single agent, DSIC forces the choice function to maximize the agent's
@@ -1210,16 +1235,362 @@ theorem dsic_smon_affine_aux (n : ℕ) :
       · -- n ≥ 3: fix the possibly-veto agent's valuation, apply the IH to the
         -- (n-1)-agent slices, then use Lemma 9 (weight independence) and
         -- Lemma 10 (offset consistency) to assemble an n-agent affine maximizer.
-        /-
-        A full implementation needs a subtype-valued sliced mechanism, and the
-        current Lemma 9 statement is false without scale normalization.
-        Moreover, `HasNoVetoPower` only gives full range when all other reports
-        may vary; it does not give full range after fixing the exceptional
-        agent's report. For a dictator, every such slice is constant, so the
-        induction hypothesis's onto premise fails. These hypotheses do not
-        justify applying the induction hypothesis to every slice.
-        -/
-        sorry
+        have h3 : 3 ≤ Fintype.card N := by
+          have hpos : 1 ≤ Fintype.card N := Fintype.card_pos
+          omega
+        obtain ⟨exceptional, hexceptional⟩ :=
+          all_but_one_no_veto M.choiceFn hsmon honto hA
+        obtain ⟨i₀, hi₀exceptional⟩ :=
+          Fintype.exists_ne_of_one_lt_card (by omega : 1 < Fintype.card N) exceptional
+        have hi₀exceptional' : i₀ ≠ exceptional := hi₀exceptional
+        have hnv₀ : HasNoVetoPower M.choiceFn i₀ :=
+          hexceptional i₀ hi₀exceptional'
+
+        let N' := {i : N // i ∈ Finset.univ.erase i₀}
+        letI : Fintype N' := ⟨(Finset.univ.erase i₀).attach, by
+          intro i
+          exact Finset.mem_attach _ i⟩
+        letI : Nonempty N' := ⟨⟨exceptional, by
+          simpa using hi₀exceptional'.symm⟩⟩
+        have hcardN' : Fintype.card N' + 1 = Fintype.card N := by
+          calc
+            Fintype.card N' + 1 = (Finset.univ.erase i₀).card + 1 := by
+              rw [Fintype.card_coe]
+            _ = Finset.univ.card := Finset.card_erase_add_one (Finset.mem_univ i₀)
+            _ = Fintype.card N := by simp
+        have hle' : Fintype.card N' ≤ k := by omega
+
+        let extendProfile (fixed : A → Real) (v : Valuation N' A) : Valuation N A :=
+          fun i a => if hi : i = i₀ then fixed a else
+            v ⟨i, by simp [Finset.mem_erase, hi]⟩ a
+        let restrictProfile (v : Valuation N A) : Valuation N' A :=
+          fun i => v i.1
+        have subtype_ne (i : N') : i.1 ≠ i₀ := by
+          simpa using (Finset.mem_erase.mp i.2).1
+        have hextend_update (fixed : A → Real) (v : Valuation N' A)
+            (i : N') (vi : A → Real) :
+            extendProfile fixed (Function.update v i vi) =
+              Function.update (extendProfile fixed v) i.1 vi := by
+          funext j a
+          by_cases hji : j = i.1
+          · subst j
+            simp [extendProfile, subtype_ne i]
+          · by_cases h₀j : j = i₀
+            · subst j
+              simp [extendProfile, Ne.symm (subtype_ne i), hji]
+            · have hsub : (⟨j, by simp [h₀j]⟩ : N') ≠ i := by
+                intro heq
+                exact hji (congrArg Subtype.val heq)
+              simp [extendProfile, hji, h₀j, hsub]
+        have hextend_restrict (fixed : A → Real) (v : Valuation N A) :
+            extendProfile fixed (restrictProfile v) = Function.update v i₀ fixed := by
+          funext j a
+          by_cases hj : j = i₀
+          · subst j
+            simp [extendProfile, restrictProfile]
+          · simp [extendProfile, restrictProfile, hj, Function.update_of_ne (Ne.symm hj)]
+
+        let slicedMechanism (fixed : A → Real) : Mechanism N' A :=
+          ⟨fun v => M.choiceFn (extendProfile fixed v),
+            fun v i => M.pay (extendProfile fixed v) i.1⟩
+        have hdsicSlice (fixed : A → Real) : IsDSIC (slicedMechanism fixed) := by
+          intro i v vi2
+          have hiReport : (extendProfile fixed v) i.1 = v i := by
+            funext a
+            simp [extendProfile, subtype_ne i]
+          let utility (p : Valuation N A) : Real :=
+            v i (M.choiceFn p) - M.pay p i.1
+          have h := hdsic i.1 (extendProfile fixed v) vi2
+          -- Bridge the DecidableEq instance mismatch: h uses Classical.propDecidable
+          have hUpdateInst :
+              (@Function.update N _ (fun a b => Classical.propDecidable (a = b)) (extendProfile fixed v) i.1 vi2) =
+              (Function.update (extendProfile fixed v) i.1 vi2) := by
+            funext j a
+            by_cases hj : j = i.1 <;> simp [Function.update, hj]
+          have hDSIC : utility (extendProfile fixed v) ≥
+              utility (Function.update (extendProfile fixed v) i.1 vi2) := by
+            rw [← hUpdateInst]
+            show utility (extendProfile fixed v) ≥ utility _
+            simpa [utility, hiReport] using h
+          have hEq : utility (extendProfile fixed (Function.update v i vi2)) =
+              utility (Function.update (extendProfile fixed v) i.1 vi2) :=
+            congrArg utility (hextend_update fixed v i vi2)
+          -- Bridge N' instance mismatch as well
+          have hUpdateInstN' :
+              (@Function.update N' _ (fun a b => Classical.propDecidable (a = b)) v i vi2) =
+              (Function.update v i vi2) := by
+            funext j a
+            by_cases hj : j = i <;> simp [Function.update, hj]
+          dsimp [slicedMechanism]
+          have hcalc : utility (extendProfile fixed v) ≥
+              utility (extendProfile fixed (Function.update v i vi2)) :=
+            calc
+              utility (extendProfile fixed v) ≥
+                  utility (Function.update (extendProfile fixed v) i.1 vi2) := hDSIC
+              _ = utility (extendProfile fixed (Function.update v i vi2)) := hEq.symm
+          rw [← hUpdateInstN'] at hcalc
+          simpa [utility] using hcalc
+        have hsmonSlice (fixed : A → Real) :
+            IsSMon (slicedMechanism fixed).choiceFn := by
+          intro i v vi vi2 a b hab hwin hwin2
+          have hwin' : M.choiceFn
+              (Function.update (extendProfile fixed v) i.1 vi) = a := by
+            rw [← hextend_update fixed v i vi]
+            exact hwin
+          have hwin2' : M.choiceFn
+              (Function.update (extendProfile fixed v) i.1 vi2) = b := by
+            rw [← hextend_update fixed v i vi2]
+            exact hwin2
+          exact hsmon i.1 (extendProfile fixed v) vi vi2 a b hab hwin' hwin2'
+        have hontoSlice (fixed : A → Real) :
+            Function.Surjective (slicedMechanism fixed).choiceFn := by
+          intro a
+          have hfull := hnv₀ fixed
+          have hmem : a ∈ range M.choiceFn i₀ fixed := by
+            rw [hfull]
+            exact Finset.mem_univ a
+          unfold range at hmem
+          simp only [Finset.mem_filter] at hmem
+          obtain ⟨v, hv⟩ := hmem.2
+          refine ⟨restrictProfile v, ?_⟩
+          change M.choiceFn (extendProfile fixed (restrictProfile v)) = a
+          rw [hextend_restrict]
+          exact hv
+        have hAMslice (fixed : A → Real) :
+            IsAffineMaximizer (slicedMechanism fixed).choiceFn :=
+          ih N' (slicedMechanism fixed) (hdsicSlice fixed) (hsmonSlice fixed)
+            (hontoSlice fixed) hA hle'
+
+        let wRaw : (A → Real) → N' → Real :=
+          fun fixed => Classical.choose (hAMslice fixed)
+        let kRaw : (A → Real) → A → Real := fun fixed =>
+          Classical.choose (Classical.choose_spec (hAMslice fixed))
+        have hraw (fixed : A → Real) :
+            (∀ i, 0 ≤ wRaw fixed i) ∧
+              (∃ i, wRaw fixed i ≠ 0) ∧
+              ∀ v a, affineScore (wRaw fixed) (kRaw fixed) v
+                ((slicedMechanism fixed).choiceFn v) ≥
+                  affineScore (wRaw fixed) (kRaw fixed) v a :=
+          Classical.choose_spec (Classical.choose_spec (hAMslice fixed))
+        let total (fixed : A → Real) : Real :=
+          Finset.univ.sum (fun i : N' => wRaw fixed i)
+        have htotal_pos (fixed : A → Real) : 0 < total fixed := by
+          obtain ⟨j, hj⟩ := (hraw fixed).2.1
+          have hjpos : 0 < wRaw fixed j :=
+            lt_of_le_of_ne ((hraw fixed).1 j) (Ne.symm hj)
+          have hjle : wRaw fixed j ≤ total fixed := by
+            dsimp [total]
+            exact Finset.single_le_sum
+              (fun i hi => (hraw fixed).1 i) (Finset.mem_univ j)
+          exact lt_of_lt_of_le hjpos hjle
+
+        let lift (g : N' → Real) : N → Real := fun i =>
+          if hi : i ≠ i₀ then g ⟨i, by simp [Finset.mem_erase, hi]⟩ else 0
+        have hsumLift (g : N' → Real) :
+            Finset.univ.sum (fun i : N => lift g i) =
+              Finset.univ.sum (fun i : N' => g i) := by
+          have hdrop :
+              Finset.univ.sum (fun i : N => lift g i) =
+                (Finset.univ.erase i₀).sum (fun i => lift g i) := by
+            rw [← Finset.sum_erase_add Finset.univ (fun i : N => lift g i)
+              (Finset.mem_univ i₀)]
+            simp [lift]
+          rw [hdrop]
+          rw [Finset.sum_subtype (s := Finset.univ.erase i₀)
+            (p := fun i : N => i ∈ Finset.univ.erase i₀) (by intro i; rfl)
+            (fun i => lift g i)]
+          calc
+            _ = (Finset.univ.erase i₀).attach.sum (fun a : N' => g a) := by
+                  apply Finset.sum_congr rfl
+                  intro a ha
+                  simp [lift, subtype_ne a]
+            _ = Finset.univ.sum (fun i : N' => g i) := rfl
+
+        let w : (A → Real) → N → Real := fun fixed i =>
+          if hi : i ≠ i₀ then
+            wRaw fixed ⟨i, by simp [Finset.mem_erase, hi]⟩ / total fixed else 0
+        let offsets : (A → Real) → A → Real := fun fixed a =>
+          kRaw fixed a / total fixed
+        have hsumw (fixed : A → Real) :
+            Finset.univ.sum (fun i : N => w fixed i) = 1 := by
+          calc
+            _ = Finset.univ.sum
+                (fun i : N => lift (fun j : N' => wRaw fixed j / total fixed) i) := by
+                  apply Finset.sum_congr rfl
+                  intro i hi
+                  by_cases hir : i = i₀
+                  · subst i
+                    simp [w, lift]
+                  · simp [w, lift, hir]
+            _ = Finset.univ.sum (fun j : N' => wRaw fixed j / total fixed) :=
+                  hsumLift (fun j : N' => wRaw fixed j / total fixed)
+            _ = (Finset.univ.sum (fun j : N' => wRaw fixed j)) * (total fixed)⁻¹ := by
+                  simp_rw [div_eq_mul_inv]
+                  rw [← Finset.sum_mul]
+            _ = 1 := by
+                  simp [total, div_eq_mul_inv, (ne_of_gt (htotal_pos fixed))]
+
+        have hsumScore (fixed : A → Real) (v : Valuation N A) (a : A) :
+            Finset.univ.sum (fun i : N => w fixed i * v i a) =
+              (Finset.univ.sum (fun j : N' => wRaw fixed j * v j.1 a)) /
+                total fixed := by
+          calc
+            _ = Finset.univ.sum (fun i : N =>
+                lift (fun j : N' => wRaw fixed j * v j.1 a / total fixed) i) := by
+                  apply Finset.sum_congr rfl
+                  intro i hi
+                  by_cases hir : i = i₀
+                  · subst i
+                    simp [w, lift]
+                  · simp [w, lift, hir]
+                    ring_nf
+            _ = Finset.univ.sum
+                (fun j : N' => wRaw fixed j * v j.1 a / total fixed) :=
+                  hsumLift (fun j : N' => wRaw fixed j * v j.1 a / total fixed)
+            _ = (Finset.univ.sum (fun j : N' => wRaw fixed j * v j.1 a)) /
+                total fixed := by
+                  simp_rw [div_eq_mul_inv]
+                  rw [← Finset.sum_mul]
+        have hscore (fixed : A → Real) (v : Valuation N A) (a : A) :
+            affineScore (w fixed) (offsets fixed) v a =
+              affineScore (wRaw fixed) (kRaw fixed) (restrictProfile v) a /
+                total fixed := by
+          unfold affineScore
+          rw [hsumScore]
+          dsimp [offsets]
+          simp only [div_eq_mul_inv]
+          ring
+
+        have hrep : ∀ fixed : A → Real,
+            (∀ i, 0 ≤ w fixed i) ∧
+            (∀ v a, affineScore (w fixed) (offsets fixed) v
+              (slice M.choiceFn i₀ fixed v) ≥ affineScore (w fixed) (offsets fixed) v a) := by
+          intro fixed
+          constructor
+          · intro i
+            by_cases hi : i = i₀
+            · simp [w, hi]
+            · simpa [w, hi, Finset.mem_erase] using
+                div_nonneg ((hraw fixed).1 ⟨i, by simp [Finset.mem_erase, hi]⟩)
+                  (le_of_lt (htotal_pos fixed))
+          · intro v a
+            have hsliceEq : (slicedMechanism fixed).choiceFn (restrictProfile v) =
+                slice M.choiceFn i₀ fixed v := by
+              change M.choiceFn (extendProfile fixed (restrictProfile v)) =
+                M.choiceFn (Function.update v i₀ fixed)
+              rw [hextend_restrict]
+            have hmax := (hraw fixed).2.2 (restrictProfile v) a
+            rw [hsliceEq] at hmax
+            rw [hscore fixed v (slice M.choiceFn i₀ fixed v), hscore fixed v a]
+            have hdiv :
+                affineScore (wRaw fixed) (kRaw fixed) (restrictProfile v) a /
+                    total fixed ≤
+                  affineScore (wRaw fixed) (kRaw fixed) (restrictProfile v)
+                    (slice M.choiceFn i₀ fixed v) / total fixed :=
+              (div_le_div_iff_of_pos_right (htotal_pos fixed)).2 hmax
+            linarith
+
+        have hwind : ∀ fixed fixed' i, i ≠ i₀ → w fixed i = w fixed' i := by
+          intro fixed fixed' i hi
+          let u : A → Real := fun a => max (fixed a) (fixed' a) + 1
+          have hle₁ : ∀ a, fixed a ≤ u a := by
+            intro a
+            dsimp [u]
+            linarith [le_max_left (fixed a) (fixed' a)]
+          have hle₂ : ∀ a, fixed' a ≤ u a := by
+            intro a
+            dsimp [u]
+            linarith [le_max_right (fixed a) (fixed' a)]
+          have hu₁ := weights_eq_upper M.choiceFn hsmon i₀ w offsets hrep hsumw hA fixed u hle₁
+          have hu₂ := weights_eq_upper M.choiceFn hsmon i₀ w offsets hrep hsumw hA fixed' u hle₂
+          have heq : w fixed = w fixed' := hu₁.symm.trans hu₂
+          exact congrFun heq i
+
+        let fixed₀ : A → Real := fun _ => 0
+        obtain ⟨j', hj'⟩ := (hraw fixed₀).2.1
+        have hjRawPos : 0 < wRaw fixed₀ j' :=
+          lt_of_le_of_ne ((hraw fixed₀).1 j') (Ne.symm hj')
+        have hjPos : 0 < w fixed₀ j'.1 := by
+          have hwval : w fixed₀ j'.1 = wRaw fixed₀ j' / total fixed₀ := by
+            simp [w, subtype_ne j']
+          rw [hwval]
+          exact div_pos hjRawPos (htotal_pos fixed₀)
+        have hnd : ∃ i, i ≠ i₀ ∧ ∃ fixed, 0 < w fixed i :=
+          ⟨j'.1, subtype_ne j', fixed₀, hjPos⟩
+        obtain ⟨alpha, halpha, hoff⟩ :=
+          offsets_consistent_of_fixed_agent_core M.choiceFn hsmon i₀ hA
+            w offsets hrep hwind hnd
+        let W : N → Real := fun i => if hi : i = i₀ then alpha else w fixed₀ i
+        let K : A → Real := fun a => offsets fixed₀ a - alpha * fixed₀ a
+        have hWnonneg : ∀ i, 0 ≤ W i := by
+          intro i
+          by_cases hi : i = i₀
+          · simp [W, hi]
+            exact halpha
+          · simp [W, hi]
+            exact (hrep fixed₀).1 i
+        have hWnonzero : ∃ i, W i ≠ 0 := by
+          refine ⟨j'.1, ?_⟩
+          have hjW : W j'.1 = w fixed₀ j'.1 := by
+            simp [W, subtype_ne j']
+          rw [hjW]
+          exact ne_of_gt hjPos
+        have hoffdiff (fixed : A → Real) (a b : A) :
+            (offsets fixed a - alpha * fixed a) -
+              (offsets fixed b - alpha * fixed b) = K a - K b := by
+          have h := hoff fixed fixed₀ a b
+          simpa [K] using h
+        have hweightEq (fixed : A → Real) (i : N) :
+            W i = w fixed i + (if i = i₀ then alpha else 0) := by
+          by_cases hi : i = i₀
+          · subst i
+            simp [W, w]
+          · have hw := hwind fixed₀ fixed i hi
+            simp [W, hi, hw]
+        have hsumW (fixed : A → Real) (v : Valuation N A) (a : A) :
+            Finset.univ.sum (fun i : N => W i * v i a) =
+              Finset.univ.sum (fun i : N => w fixed i * v i a) +
+                alpha * v i₀ a := by
+          calc
+            _ = Finset.univ.sum (fun i : N =>
+                (w fixed i + (if i = i₀ then alpha else 0)) * v i a) := by
+                  apply Finset.sum_congr rfl
+                  intro i hi
+                  rw [hweightEq fixed i]
+            _ = Finset.univ.sum (fun i : N => w fixed i * v i a) +
+                Finset.univ.sum (fun i : N =>
+                  (if i = i₀ then alpha else 0) * v i a) := by
+                  rw [← Finset.sum_add_distrib]
+                  apply Finset.sum_congr rfl
+                  intro i hi
+                  ring
+            _ = Finset.univ.sum (fun i : N => w fixed i * v i a) +
+                alpha * v i₀ a := by
+                  congr 1
+                  rw [Finset.sum_eq_single i₀]
+                  · simp
+                  · intro i hi hne
+                    simp [hne]
+                  · simp
+        have hscoreDiff (v : Valuation N A) (a b : A) :
+            affineScore W K v a - affineScore W K v b =
+              affineScore (w (v i₀)) (offsets (v i₀)) v a -
+                affineScore (w (v i₀)) (offsets (v i₀)) v b := by
+          have hsumA := hsumW (v i₀) v a
+          have hsumB := hsumW (v i₀) v b
+          have hoffset := hoffdiff (v i₀) a b
+          unfold affineScore
+          rw [hsumA, hsumB]
+          dsimp [K] at hoffset ⊢
+          linarith
+        refine ⟨W, K, hWnonneg, hWnonzero, ?_⟩
+        intro v a
+        have hsliceMax : affineScore (w (v i₀)) (offsets (v i₀)) v
+            (M.choiceFn v) ≥ affineScore (w (v i₀)) (offsets (v i₀)) v a := by
+          have h := (hrep (v i₀)).2 v a
+          simpa [slice, Function.update_self] using h
+        have hdiff := hscoreDiff v (M.choiceFn v) a
+        linarith
 
 /- If every agent's gap between `a` and any other alternative is strictly
    improved, W-MON lets us update the agents one at a time without changing
