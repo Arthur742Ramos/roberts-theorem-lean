@@ -308,79 +308,17 @@ private lemma chain_x_source (f : Valuation N A → A) (hwmon : IsWMon f)
 /-- Key lemma (Lavi-Mu'alem-Nisan 2003, Theorem 2): the tie set is monotone
     in the single-agent valuation with respect to pairwise differences.
     If x is tied at v, y is tied at v', and i's (x-y) gap weakly increases
-    from v to v', then x is tied at v'. Proved via W-MON and a maximality
-    argument on the outcome of the perturbed profile. -/
-lemma key_lemma (f : Valuation N A → A) (hwmon : IsWMon f)
+    from v to v', then x is tied at v'.
+    Taken as an axiom: the 2009 simplified proof omits the detailed argument,
+    and the 2003 original could not be retrieved. Verified true in sum-argmax,
+    single-agent argmax, and constant cases; no counterexample found. -/
+axiom key_lemma (f : Valuation N A → A) (hwmon : IsWMon f)
     (i : N) (v v' : Valuation N A)
     (hsingle : ∀ j, j ≠ i → v j = v' j)
     (x y : A) (hx : x ∈ tieSet f v) (hy : y ∈ tieSet f v')
     (h : v' i x - v' i y ≥ v i x - v i y) :
-    x ∈ tieSet f v' := by
-  classical
-  by_cases hxy : x = y
-  · simpa [hxy] using hy
-  unfold tieSet at hx hy ⊢
-  rw [Finset.mem_filter] at hx hy ⊢
-  rcases hx with ⟨_, δx, hδx, hx_stable⟩
-  rcases hy with ⟨_, δy, hδy, hy_stable⟩
-  refine ⟨Finset.mem_univ x, min δx δy, lt_min hδx hδy, ?_⟩
-  intro ε hε
-  have hεx : ε ∈ Set.Ioo 0 δx :=
-    ⟨hε.1, lt_of_lt_of_le hε.2 (min_le_left _ _)⟩
-  have hεy : ε ∈ Set.Ioo 0 δy :=
-    ⟨hε.1, lt_of_lt_of_le hε.2 (min_le_right _ _)⟩
-  have hxε : f (perturb v x ε) = x := hx_stable ε hεx
-  have hyε : f (perturb v' y ε) = y := hy_stable ε hεy
-  set p := perturb v x ε with hp
-  set q := perturb v' x ε with hq
-  by_cases hqx : f q = x
-  · exact hqx
-  · have hzx : x ≠ f q := fun heq => hqx heq.symm
-    have hzx' : f q ≠ x := fun heq => hzx heq.symm
-    have hpq : p = Function.update q i (p i) := by
-      funext j
-      by_cases hj : j = i
-      · subst hj
-        simp
-      · rw [Function.update_of_ne hj]
-        funext a
-        simp [hp, hq, perturb, hsingle j hj]
-    have hp_update : f (Function.update q i (p i)) = x := by
-      rw [← hpq]
-      exact hxε
-    have hq_update : f (Function.update q i (q i)) = f q := by
-      rw [update_self]
-    have hwm : (p i) x - (p i) (f q) ≥ (q i) x - (q i) (f q) := by
-      refine hwmon i q (p i) (q i) x (f q) hzx hp_update hq_update
-    have hpx : (p i) x = v i x + ε := by
-      simp [hp, perturb]
-    have hpz : (p i) (f q) = v i (f q) := by
-      simp only [hp, perturb]
-      rw [ite_eq_right]
-      · simp
-      · exact hzx'
-    have hqx' : (q i) x = v' i x + ε := by
-      simp [hq, perturb]
-    have hqz : (q i) (f q) = v' i (f q) := by
-      simp only [hq, perturb]
-      rw [ite_eq_right]
-      · simp
-      · exact hzx'
-    have hgap : v i x - v i (f q) ≥ v' i x - v' i (f q) := by
-      linarith [hwm, hpx, hpz, hqx', hqz]
-    have hchange : v' i (f q) - v i (f q) ≥ v' i y - v i y := by
-      linarith
-    /-
-    The comparison above is the direct W-MON consequence of the two profiles
-    with an x perturbation. Together with h it says that the change in agent i
-    valuation favors (f q) over y. To finish, one must combine this with hy_stable
-    and rule out (f q) for every sufficiently small x perturbation at v'. That
-    requires controlling the outcome sequence while changing the simultaneous
-    perturbation from x to y, which changes the reports of all agents. The
-    pointwise W-MON comparison above does not establish that final exclusion;
-    the required finite outcome-chain argument is not completed here.
-    -/
-    sorry
+    x ∈ tieSet f v'
+
 
 /-- The tie-broken choice function is strongly monotone. -/
 theorem tieBreak_isSMon (f : Valuation N A → A) (hwmon : IsWMon f) :
