@@ -135,6 +135,176 @@ lemma tieBreak_mem (f : Valuation N A → A) (hwmon : IsWMon f) (v : Valuation N
     tieBreak f hwmon v ∈ tieSet f v :=
   Finset.max'_mem _ _
 
+/-- Bump-interpolation chain: y-bump on S, x-bump off S, base valuation `base`.
+    Used in the proof of `key_lemma` to interpolate between an x-perturbation
+    (S = empty) and a y-perturbation (S = univ) one agent at a time. -/
+private def bumpChain (base : Valuation N A) (x y : A) (ε : Real) (S : Finset N) :
+    Valuation N A :=
+  fun j a => base j a + if (j ∈ S ∧ a = y) ∨ (j ∉ S ∧ a = x) then ε else 0
+
+omit [Fintype N] [Fintype A] [Nonempty N] [Nonempty A] in
+/-- The chain at S ∪ {j} agrees with the chain at S off of j. -/
+private lemma bumpChain_update (base : Valuation N A) (x y : A) (ε : Real)
+    (S : Finset N) (j : N) (hj : j ∉ S) :
+    bumpChain base x y ε (insert j S)
+      = Function.update (bumpChain base x y ε S) j
+        ((bumpChain base x y ε (insert j S)) j) := by
+  funext k
+  by_cases hkj : k = j
+  · subst hkj; simp
+  · rw [Function.update_of_ne hkj]
+    funext a
+    simp only [bumpChain]
+    have hiff : ((k ∈ insert j S ∧ a = y) ∨ (k ∉ insert j S ∧ a = x)) ↔
+        ((k ∈ S ∧ a = y) ∨ (k ∉ S ∧ a = x)) := by
+      have hmem : (k ∈ insert j S) ↔ (k ∈ S) := by simp [hkj]
+      have hnmem : (k ∉ insert j S) ↔ (k ∉ S) := by simp [hkj]
+      tauto
+    simp only [hiff]
+
+omit [Fintype N] [Fintype A] [Nonempty N] [Nonempty A] in
+/-- y is a sink along the chain: once y wins, it keeps winning.
+    Proof: W-MON at the transitioning agent; the y-bump strictly increases
+    y's advantage, giving a clean contradiction from `0 < ε`. -/
+private lemma chain_y_sink (f : Valuation N A → A) (hwmon : IsWMon f)
+    (base : Valuation N A) (x y : A) (hxy : x ≠ y) (ε : Real) (hε : 0 < ε)
+    (S : Finset N) (j : N) (hj : j ∉ S)
+    (hwin : f (bumpChain base x y ε S) = y) :
+    f (bumpChain base x y ε (insert j S)) = y := by
+  classical
+  by_contra hne
+  have hupd := bumpChain_update base x y ε S j hj
+  generalize hb : f (bumpChain base x y ε (insert j S)) = b
+  have hby : y ≠ b := by rw [← hb]; exact fun h => hne h.symm
+  have hfirst : f (Function.update (bumpChain base x y ε S) j
+      ((bumpChain base x y ε S) j)) = y := by
+    have hself : Function.update (bumpChain base x y ε S) j
+        ((bumpChain base x y ε S) j) = bumpChain base x y ε S := by
+      funext k a
+      by_cases hkj : k = j
+      · subst hkj; simp
+      · rw [Function.update_of_ne hkj]
+    rw [hself]; exact hwin
+  have hsecond : f (Function.update (bumpChain base x y ε S) j
+      ((bumpChain base x y ε (insert j S)) j)) = b := by
+    rw [← hupd, hb]
+  have hmon := hwmon j (bumpChain base x y ε S)
+    ((bumpChain base x y ε S) j)
+    ((bumpChain base x y ε (insert j S)) j) y b hby hfirst hsecond
+  have e1 : ((bumpChain base x y ε S) j) y = base j y := by
+    show base j y + (if (j ∈ S ∧ y = y) ∨ (j ∉ S ∧ y = x) then ε else 0) = _
+    have hneg : ¬ ((j ∈ S ∧ y = y) ∨ (j ∉ S ∧ y = x)) := by
+      rintro (⟨h1, _⟩ | ⟨_, h2⟩)
+      · exact hj h1
+      · exact hxy h2.symm
+    rw [if_neg hneg, add_zero]
+  have e2 : ((bumpChain base x y ε S) j) b = base j b + if b = x then ε else 0 := by
+    show base j b + (if (j ∈ S ∧ b = y) ∨ (j ∉ S ∧ b = x) then ε else 0) = _
+    have hiff : ((j ∈ S ∧ b = y) ∨ (j ∉ S ∧ b = x)) ↔ (b = x) := by
+      simp [hj]
+    simp only [hiff]
+  have e3 : ((bumpChain base x y ε (insert j S)) j) y = base j y + ε := by
+    show base j y + (if (j ∈ insert j S ∧ y = y) ∨ (j ∉ insert j S ∧ y = x) then ε else 0) = _
+    have htrue : ((j ∈ insert j S ∧ y = y) ∨ (j ∉ insert j S ∧ y = x)) :=
+      Or.inl ⟨by simp, rfl⟩
+    rw [if_pos htrue]
+  have e4 : ((bumpChain base x y ε (insert j S)) j) b
+      = base j b + if b = y then ε else 0 := by
+    show base j b + (if (j ∈ insert j S ∧ b = y) ∨ (j ∉ insert j S ∧ b = x) then ε else 0) = _
+    have hiff : ((j ∈ insert j S ∧ b = y) ∨ (j ∉ insert j S ∧ b = x)) ↔ (b = y) := by
+      constructor
+      · rintro (⟨_, h2⟩ | ⟨h1, _⟩)
+        · exact h2
+        · exact absurd (Finset.mem_insert_self j S) h1
+      · intro h
+        exact Or.inl ⟨Finset.mem_insert_self j S, h⟩
+    simp only [hiff]
+  rw [e1, e2, e3, e4] at hmon
+  by_cases hbx : b = x
+  · have hbny : b ≠ y := by rw [hbx]; exact hxy
+    have e5 : (if b = x then (ε : Real) else 0) = ε := by simp [hbx]
+    have e6 : (if b = y then (ε : Real) else 0) = 0 := by simp [hbny]
+    rw [e5, e6] at hmon
+    linarith [hε]
+  · have hbny : b ≠ y := Ne.symm hby
+    have e5 : (if b = x then (ε : Real) else 0) = 0 := by simp [hbx]
+    have e6 : (if b = y then (ε : Real) else 0) = 0 := by simp [hbny]
+    rw [e5, e6] at hmon
+    linarith [hε]
+
+omit [Fintype N] [Fintype A] [Nonempty N] [Nonempty A] in
+/-- x is a source along the chain: x cannot be entered.
+    Proof: W-MON at the transitioning agent; entering x would require
+    overcoming the strictly positive bump disadvantage. -/
+private lemma chain_x_source (f : Valuation N A → A) (hwmon : IsWMon f)
+    (base : Valuation N A) (x y : A) (hxy : x ≠ y) (ε : Real) (hε : 0 < ε)
+    (S : Finset N) (j : N) (hj : j ∉ S)
+    (hwin : f (bumpChain base x y ε (insert j S)) = x) :
+    f (bumpChain base x y ε S) = x := by
+  classical
+  by_contra hne
+  have hupd := bumpChain_update base x y ε S j hj
+  generalize hb : f (bumpChain base x y ε S) = b
+  have hbx : b ≠ x := by rw [← hb]; exact hne
+  -- W-MON with a := x at the insert profile, b := b at the S profile.
+  have hfirst : f (Function.update (bumpChain base x y ε S) j
+      ((bumpChain base x y ε (insert j S)) j)) = x := by
+    rw [← hupd]; exact hwin
+  have hsecond : f (Function.update (bumpChain base x y ε S) j
+      ((bumpChain base x y ε S) j)) = b := by
+    have hself : Function.update (bumpChain base x y ε S) j
+        ((bumpChain base x y ε S) j) = bumpChain base x y ε S := by
+      funext k a
+      by_cases hkj : k = j
+      · subst hkj; simp
+      · rw [Function.update_of_ne hkj]
+    rw [hself, hb]
+  have hmon := hwmon j (bumpChain base x y ε S)
+    ((bumpChain base x y ε (insert j S)) j)
+    ((bumpChain base x y ε S) j) x b (Ne.symm hbx) hfirst hsecond
+  have e1 : ((bumpChain base x y ε (insert j S)) j) x = base j x := by
+    show base j x + (if (j ∈ insert j S ∧ x = y) ∨ (j ∉ insert j S ∧ x = x) then ε else 0) = _
+    have hneg : ¬ ((j ∈ insert j S ∧ x = y) ∨ (j ∉ insert j S ∧ x = x)) := by
+      rintro (⟨h1, h2⟩ | ⟨h1, _⟩)
+      · exact hxy h2
+      · simp at h1
+    rw [if_neg hneg, add_zero]
+  have e2 : ((bumpChain base x y ε (insert j S)) j) b
+      = base j b + if b = y then ε else 0 := by
+    show base j b + (if (j ∈ insert j S ∧ b = y) ∨ (j ∉ insert j S ∧ b = x) then ε else 0) = _
+    have hiff : ((j ∈ insert j S ∧ b = y) ∨ (j ∉ insert j S ∧ b = x)) ↔ (b = y) := by
+      constructor
+      · rintro (⟨_, h2⟩ | ⟨h1, _⟩)
+        · exact h2
+        · exact absurd (Finset.mem_insert_self j S) h1
+      · intro h
+        exact Or.inl ⟨Finset.mem_insert_self j S, h⟩
+    simp only [hiff]
+  have e3 : ((bumpChain base x y ε S) j) x = base j x + ε := by
+    show base j x + (if (j ∈ S ∧ x = y) ∨ (j ∉ S ∧ x = x) then ε else 0) = _
+    have htrue : ((j ∈ S ∧ x = y) ∨ (j ∉ S ∧ x = x)) := Or.inr ⟨hj, rfl⟩
+    rw [if_pos htrue]
+  have e4 : ((bumpChain base x y ε S) j) b = base j b + if b = x then ε else 0 := by
+    show base j b + (if (j ∈ S ∧ b = y) ∨ (j ∉ S ∧ b = x) then ε else 0) = _
+    have hiff : ((j ∈ S ∧ b = y) ∨ (j ∉ S ∧ b = x)) ↔ (b = x) := by
+      simp [hj]
+    simp only [hiff]
+  rw [e1, e2, e3, e4] at hmon
+  -- hmon : (base j x - (base j b + (if b=y then ε else 0))) ≥
+  --        ((base j x + ε) - (base j b + (if b=x then ε else 0)))
+  -- i.e., (if b=x then ε else 0) - (if b=y then ε else 0) ≥ ε.
+  have key : (if b = x then (ε : Real) else 0) - (if b = y then (ε : Real) else 0) ≥ ε := by
+    linarith
+  by_cases hby : b = y
+  · have e5 : (if b = x then (ε : Real) else 0) = 0 := by simp [hbx]
+    have e6 : (if b = y then (ε : Real) else 0) = ε := by simp [hby]
+    rw [e5, e6] at key
+    linarith [hε]
+  · have e5 : (if b = x then (ε : Real) else 0) = 0 := by simp [hbx]
+    have e6 : (if b = y then (ε : Real) else 0) = 0 := by simp [hby]
+    rw [e5, e6] at key
+    linarith [hε]
+
 /-- Key lemma (Lavi-Mu'alem-Nisan 2003, Theorem 2): the tie set is monotone
     in the single-agent valuation with respect to pairwise differences.
     If x is tied at v, y is tied at v', and i's (x-y) gap weakly increases
