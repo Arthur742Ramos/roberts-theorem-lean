@@ -1,9 +1,11 @@
-import Roberts.NoVeto
-import Mathlib.Algebra.Order.BigOperators.Group.Finset
-import Mathlib.Tactic.Ring
-import Mathlib.Tactic.LinearCombination
-import Mathlib.Algebra.Order.Archimedean.Basic
-import Mathlib.Algebra.Order.Archimedean.Real.Basic
+module
+
+public import Roberts.NoVeto
+public import Mathlib.Algebra.Order.BigOperators.Group.Finset
+public import Mathlib.Tactic.Ring
+public import Mathlib.Tactic.LinearCombination
+public import Mathlib.Algebra.Order.Archimedean.Basic
+public import Mathlib.Algebra.Order.Archimedean.Real.Basic
 
 namespace Roberts
 
@@ -15,14 +17,14 @@ variable {N A : Type*} [Fintype N] [Fintype A] [DecidableEq N] [DecidableEq A]
 /-- Affine price structure: agent i_price's prices are affine in agent i_val's values.
     price M i_price v a = h v - alpha * v i_val a - beta a with 0 ≤ alpha.
     This is the price representation of Lemma 5.1 in the modular proof. -/
-def HasAffinePrices (M : Mechanism N A) (i_price i_val : N) : Prop :=
+@[expose] public def HasAffinePrices (M : Mechanism N A) (i_price i_val : N) : Prop :=
   Exists fun alpha : Real => 0 ≤ alpha ∧ Exists fun h : Valuation N A → Real =>
     Exists fun beta : A → Real => ∀ v a, price M i_price v a = h v - alpha * v i_val a - beta a
 
 /-- Every alternative is achievable by agent i2 at any profile, from i1's no-veto power.
     This is the "prices are finite" step of Claim 5.3: i1 having no veto power means
     i2 is decisive, so taxation applies to every alternative. -/
-lemma achievable_of_noVeto {M : Mechanism N A} {i1 i2 : N} (h12 : i1 ≠ i2)
+public lemma achievable_of_noVeto {M : Mechanism N A} {i1 i2 : N} (h12 : i1 ≠ i2)
     (hall : ∀ i, i = i1 ∨ i = i2) (hdec : HasNoVetoPower M.choiceFn i1)
     (w : Valuation N A) (c : A) : Achievable M.choiceFn i2 w c := by
   classical
@@ -44,7 +46,7 @@ lemma achievable_of_noVeto {M : Mechanism N A} {i1 i2 : N} (h12 : i1 ≠ i2)
     Proof: otherwise pick agent i2's value-difference strictly between the two
     price-differences (with very low values elsewhere); taxation forces
     f = b at v but f = a at v', contradicting S-MON. -/
-lemma pairwise_le {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+public lemma pairwise_le {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1)
     (v v' : Valuation N A) (a b : A) (hab : a ≠ b)
@@ -158,7 +160,7 @@ lemma pairwise_le {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choic
   linarith [hle, hs]
 
 /-- Pairwise determination: equal value-differences give equal price-differences. -/
-lemma pairwise_eq {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+public lemma pairwise_eq {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1)
     (v v' : Valuation N A) (a b : A) (hab : a ≠ b)
@@ -170,22 +172,22 @@ lemma pairwise_eq {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choic
 /-! ## Increment analysis: the price difference is affine in one coordinate -/
 
 /-- Bumping agent i1's value for alternative a by δ in profile v. -/
-def bumpVal {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N) (v : Valuation N A)
+@[expose] public def bumpVal {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N) (v : Valuation N A)
     (a : A) (δ : Real) : Valuation N A :=
   Function.update v i1 (fun a' => v i1 a' + if a' = a then δ else 0)
 
-lemma bumpVal_i1 {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
+public lemma bumpVal_i1 {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
     (v : Valuation N A) (a : A) (δ : Real) (a' : A) :
     (bumpVal i1 v a δ) i1 a' = v i1 a' + if a' = a then δ else 0 := by
   simp [bumpVal]
 
-lemma bumpVal_j_ne {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
+public lemma bumpVal_j_ne {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
     (v : Valuation N A) (a : A) (δ : Real) {j : N} (hj : j ≠ i1) :
     (bumpVal i1 v a δ) j = v j := by
   unfold bumpVal
   exact Function.update_of_ne hj _ _
 
-lemma bumpVal_zero {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
+public lemma bumpVal_zero {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
     (v : Valuation N A) (a : A) : bumpVal i1 v a 0 = v := by
   unfold bumpVal
   have h : (fun a' : A => v i1 a' + if a' = a then (0:Real) else 0) = v i1 := by
@@ -195,7 +197,7 @@ lemma bumpVal_zero {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
   exact Function.update_eq_self i1 v
 
 /-- Single bump: the a-vs-c difference shifts by δ. -/
-lemma bumpVal_adiff {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
+public lemma bumpVal_adiff {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
     (v : Valuation N A) (a c : A) (δ : Real) (hac : a ≠ c) :
     (bumpVal i1 v a δ) i1 a - (bumpVal i1 v a δ) i1 c = (v i1 a + δ) - v i1 c := by
   have h1 : (bumpVal i1 v a δ) i1 a = v i1 a + δ := by
@@ -205,7 +207,7 @@ lemma bumpVal_adiff {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
   rw [h1, h2]
 
 /-- Double bump (a then b): the a-vs-c difference still shifts by δ only. -/
-lemma bumpVal2_adiff {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
+public lemma bumpVal2_adiff {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
     (v : Valuation N A) (a b c : A) (δ : Real)
     (hab : a ≠ b) (hac : a ≠ c) (hbc : b ≠ c) :
     (bumpVal i1 (bumpVal i1 v a δ) b δ) i1 a - (bumpVal i1 (bumpVal i1 v a δ) b δ) i1 c
@@ -220,12 +222,12 @@ lemma bumpVal2_adiff {N A : Type*} [DecidableEq N] [DecidableEq A] (i1 : N)
   rw [h1, h2]
 
 /-- Normalized price Q_a(v) = P_a(v) - P_{c0}(v). -/
-noncomputable def normPrice (M : Mechanism N A) (i2 : N) (c0 : A) (v : Valuation N A)
+@[expose] public noncomputable def normPrice (M : Mechanism N A) (i2 : N) (c0 : A) (v : Valuation N A)
     (a : A) : Real :=
   price M i2 v a - price M i2 v c0
 
 /-- The normalized price difference depends only on i1's value difference. -/
-lemma Q_pairwise {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+public lemma Q_pairwise {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1) (c0 : A)
     (v v' : Valuation N A) (a : A) (ha : a ≠ c0)
@@ -235,7 +237,7 @@ lemma Q_pairwise {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choice
   exact pairwise_eq hdsic hsmon h12 hall hdec v v' a c0 ha heq
 
 /-- Claim 5.6: the increment from bumping a by δ is the same for any a ≠ c0. -/
-lemma incr_eq {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+public lemma incr_eq {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1) (c0 : A)
     (v : Valuation N A) (a b : A) (ha : a ≠ c0) (hb : b ≠ c0) (hab : a ≠ b)
@@ -281,7 +283,7 @@ lemma incr_eq {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
   linarith
 
 /-- The increment depends only on the a-vs-c0 value difference. -/
-lemma incr_dep {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+public lemma incr_dep {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1) (c0 : A)
     (v v' : Valuation N A) (a : A) (ha : a ≠ c0) (δ : Real)
@@ -299,7 +301,7 @@ lemma incr_dep {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn
   linarith
 
 /-- With ≥3 alternatives there is always a third alternative distinct from two given. -/
-lemma exists_ne_ne {A : Type*} [Fintype A] [DecidableEq A] {a c0 : A} (ha : a ≠ c0)
+public lemma exists_ne_ne {A : Type*} [Fintype A] [DecidableEq A] {a c0 : A} (ha : a ≠ c0)
     (hA : 3 ≤ Fintype.card A) : ∃ b, b ≠ a ∧ b ≠ c0 := by
   by_contra h
   rw [not_exists] at h
@@ -317,7 +319,7 @@ lemma exists_ne_ne {A : Type*} [Fintype A] [DecidableEq A] {a c0 : A} (ha : a �
   omega
 
 /-- Claim 5.7: the increment is independent of the profile (for fixed a, δ). -/
-lemma incr_const {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+public lemma incr_const {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1) (c0 : A) (hA : 3 ≤ Fintype.card A)
     (a : A) (ha : a ≠ c0) (δ : Real) (v v' : Valuation N A) :
@@ -350,7 +352,7 @@ lemma incr_const {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choice
 
 /-- An additive, monotone-decreasing real function is linear: l(δ) = l(1) * δ.
     This is the analytic core of Claim 5.7's "additivity implies linearity". -/
-lemma additive_mono_linear {l : Real → Real}
+public lemma additive_mono_linear {l : Real → Real}
     (hadd : ∀ δ γ, l (δ + γ) = l δ + l γ)
     (hmono : ∀ δ γ, δ ≥ γ → l δ ≤ l γ) :
     ∀ δ, l δ = l 1 * δ := by
@@ -506,12 +508,12 @@ lemma additive_mono_linear {l : Real → Real}
 
 /-- The increment function for Claim 5.7: `l(δ)` is the profile-independent
 normalized-price increment when `i1` bumps `a0` by `δ`. -/
-noncomputable def incrFun (M : Mechanism N A) (i1 i2 : N) (c0 a0 : A) (δ : Real) : Real :=
+@[expose] public noncomputable def incrFun (M : Mechanism N A) (i1 i2 : N) (c0 a0 : A) (δ : Real) : Real :=
   normPrice M i2 c0 (bumpVal i1 (fun _ _ => 0) a0 δ) a0 -
     normPrice M i2 c0 (fun _ _ => 0) a0
 
 /-- `l` is additive (from Claim 5.7, `incr_const`). -/
-lemma incrFun_add {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+public lemma incrFun_add {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1) (c0 : A) (hA : 3 ≤ Fintype.card A)
     (a0 : A) (ha0 : a0 ≠ c0) (δ γ : Real) :
@@ -532,7 +534,7 @@ lemma incrFun_add {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choic
   linarith
 
 /-- `l` is monotone-decreasing (from Claim 5.3, `pairwise_le`). -/
-lemma incrFun_mono {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+public lemma incrFun_mono {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1) (c0 a0 : A) (ha0 : a0 ≠ c0)
     {δ γ : Real} (h : δ ≥ γ) :
@@ -547,7 +549,7 @@ lemma incrFun_mono {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choi
   linarith
 
 /-- `l` is linear: `l(δ) = l(1) * δ` (Claim 5.7 + the analytic lemma). -/
-lemma incrFun_linear {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+public lemma incrFun_linear {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1) (c0 : A) (hA : 3 ≤ Fintype.card A)
     (a0 : A) (ha0 : a0 ≠ c0) (δ : Real) :
@@ -559,7 +561,7 @@ lemma incrFun_linear {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.ch
   exact additive_mono_linear hadd hmono δ
 
 /-- The normalized price is affine in `i1`'s value-difference (Claims 5.6-5.7). -/
-lemma Q_affine {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+public lemma Q_affine {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1) (c0 : A) (_hA : 3 ≤ Fintype.card A)
     (a0 : A) (ha0 : a0 ≠ c0) (v : Valuation N A) (a : A) (ha : a ≠ c0) :
@@ -581,7 +583,7 @@ lemma Q_affine {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn
   linarith [h1, h2]
 
 /-- Claim 5.4 (two-agent): `i2`'s prices are affine in `i1`'s valuation. -/
-theorem price_affine_form {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
+public theorem price_affine_form {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1) (hA : 3 ≤ Fintype.card A) :
     HasAffinePrices M i2 i1 := by
@@ -617,7 +619,7 @@ theorem price_affine_form {M : Mechanism N A} (hdsic : IsDSIC M) (hsmon : IsSMon
 
 /-- Lemma 5.1 (two-agent Roberts): a DSIC mechanism for two agents with no veto
 power is an affine maximizer. -/
-theorem two_agent_affine_maximizer {M : Mechanism N A} (hdsic : IsDSIC M)
+public theorem two_agent_affine_maximizer {M : Mechanism N A} (hdsic : IsDSIC M)
     (hsmon : IsSMon M.choiceFn)
     {i1 i2 : N} (h12 : i1 ≠ i2) (hall : ∀ i, i = i1 ∨ i = i2)
     (hdec : HasNoVetoPower M.choiceFn i1) (hA : 3 ≤ Fintype.card A) :

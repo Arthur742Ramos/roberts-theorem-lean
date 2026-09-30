@@ -1,7 +1,9 @@
-import Roberts.Taxation
-import Mathlib.Data.Fintype.EquivFin
-import Mathlib.Data.Finset.Max
-import Mathlib.Order.Bounds.Basic
+module
+
+public import Roberts.Taxation
+public import Mathlib.Data.Fintype.EquivFin
+public import Mathlib.Data.Finset.Max
+public import Mathlib.Order.Bounds.Basic
 
 namespace Roberts
 
@@ -11,25 +13,25 @@ variable {N A : Type*} [Fintype N] [Fintype A] [DecidableEq N] [DecidableEq A]
   [Nonempty N] [Nonempty A]
 
 /-- Strong monotonicity: strict version of W-MON. -/
-def IsSMon (f : Valuation N A → A) : Prop :=
+@[expose] public def IsSMon (f : Valuation N A → A) : Prop :=
   ∀ i v (vi vi2 : A → Real) (a b : A), a ≠ b →
     f (Function.update v i vi) = a →
     f (Function.update v i vi2) = b →
       vi a - vi b > vi2 a - vi2 b
 
 /-- S-MON implies W-MON: the strict gap inequality gives the weak one. -/
-lemma smon_implies_wmon (f : Valuation N A → A) (hsmon : IsSMon f) :
+public lemma smon_implies_wmon (f : Valuation N A → A) (hsmon : IsSMon f) :
     IsWMon f := by
   intro i v vi vi2 a b hab h1 h2
   have h := hsmon i v vi vi2 a b hab h1 h2
   linarith
 
 /-- Simultaneous perturbation: bump every agent's value for `x` by `ε`. -/
-def perturb (v : Valuation N A) (x : A) (ε : Real) : Valuation N A :=
+@[expose] public def perturb (v : Valuation N A) (x : A) (ε : Real) : Valuation N A :=
   fun i a => v i a + if a = x then ε else 0
 
 /-- The tie set: alternatives that win after a small simultaneous bump. -/
-noncomputable def tieSet (f : Valuation N A → A) (v : Valuation N A) : Finset A :=
+@[expose] public noncomputable def tieSet (f : Valuation N A → A) (v : Valuation N A) : Finset A :=
   by
     classical
     exact Finset.univ.filter fun x =>
@@ -38,7 +40,7 @@ noncomputable def tieSet (f : Valuation N A → A) (v : Valuation N A) : Finset 
 /-- Bumping a single agent's value for the winner preserves the outcome.
     This is the core stability fact: W-MON prevents the winner from changing
     when only the winner's value is increased. -/
-lemma bump_winner_stable (f : Valuation N A → A) (hwmon : IsWMon f)
+public lemma bump_winner_stable (f : Valuation N A → A) (hwmon : IsWMon f)
     (w : Valuation N A) (j : N) (ε : Real) (hε : 0 < ε) :
     f (Function.update w j (fun a => w j a + if a = f w then ε else 0)) = f w := by
   classical
@@ -57,7 +59,7 @@ lemma bump_winner_stable (f : Valuation N A → A) (hwmon : IsWMon f)
 
 /-- Auxiliary: bumping the winner for any subset of agents preserves outcome.
     Proved by Finset induction using bump_winner_stable at each step. -/
-lemma perturb_stable_aux (f : Valuation N A → A) (hwmon : IsWMon f)
+public lemma perturb_stable_aux (f : Valuation N A → A) (hwmon : IsWMon f)
     (v : Valuation N A) (ε : Real) (hε : 0 < ε) (s : Finset N) :
     f (fun i a => v i a + (if i ∈ s ∧ a = f v then ε else 0)) = f v := by
   classical
@@ -100,7 +102,7 @@ lemma perturb_stable_aux (f : Valuation N A → A) (hwmon : IsWMon f)
 
 
 /-- f(v) is always in its own tie set (by bumping the winner). -/
-lemma mem_tieSet_self (f : Valuation N A → A) (hwmon : IsWMon f) (v : Valuation N A) :
+public lemma mem_tieSet_self (f : Valuation N A → A) (hwmon : IsWMon f) (v : Valuation N A) :
     f v ∈ tieSet f v := by
   classical
   unfold tieSet
@@ -117,21 +119,21 @@ lemma mem_tieSet_self (f : Valuation N A → A) (hwmon : IsWMon f) (v : Valuatio
   exact h
 
 /-- Tie set is nonempty. -/
-lemma tieSet_nonempty (f : Valuation N A → A) (hwmon : IsWMon f) (v : Valuation N A) :
+public lemma tieSet_nonempty (f : Valuation N A → A) (hwmon : IsWMon f) (v : Valuation N A) :
     (tieSet f v).Nonempty :=
   ⟨f v, mem_tieSet_self f hwmon v⟩
 
 -- Fixed linear order on A for tie-breaking.
 -- Since A is a fintype, we transport the order from Fin (card A).
-noncomputable instance : LinearOrder A :=
+public noncomputable instance : LinearOrder A :=
   LinearOrder.lift' (Fintype.equivFin A) (Fintype.equivFin A).injective
 
 /-- Tie-broken choice function: max of tie set under fixed order. -/
-noncomputable def tieBreak (f : Valuation N A → A) (hwmon : IsWMon f) (v : Valuation N A) : A :=
+@[expose] public noncomputable def tieBreak (f : Valuation N A → A) (hwmon : IsWMon f) (v : Valuation N A) : A :=
   (tieSet f v).max' (tieSet_nonempty f hwmon v)
 
 /-- tieBreak selects from the tie set. -/
-lemma tieBreak_mem (f : Valuation N A → A) (hwmon : IsWMon f) (v : Valuation N A) :
+public lemma tieBreak_mem (f : Valuation N A → A) (hwmon : IsWMon f) (v : Valuation N A) :
     tieBreak f hwmon v ∈ tieSet f v :=
   Finset.max'_mem _ _
 
@@ -380,7 +382,7 @@ private lemma outcome_mem_of_gap_increase
     in the single-agent valuation with respect to pairwise differences.
     If x is tied at v, y is tied at v', and i's (x-y) gap weakly increases
     from v to v', then x is tied at v'. -/
-lemma key_lemma (f : Valuation N A → A) (hwmon : IsWMon f)
+public lemma key_lemma (f : Valuation N A → A) (hwmon : IsWMon f)
     (i : N) (v v' : Valuation N A)
     (hsingle : ∀ j, j ≠ i → v j = v' j)
     (x y : A) (hx : x ∈ tieSet f v) (hy : y ∈ tieSet f v')
@@ -546,7 +548,7 @@ lemma key_lemma (f : Valuation N A → A) (hwmon : IsWMon f)
 
 
 /-- The tie-broken choice function is strongly monotone. -/
-theorem tieBreak_isSMon (f : Valuation N A → A) (hwmon : IsWMon f) :
+public theorem tieBreak_isSMon (f : Valuation N A → A) (hwmon : IsWMon f) :
     IsSMon (tieBreak f hwmon) := by
   intro i v vi vi2 a b hab h1 h2
   -- v1 and v2 differ only in agent i

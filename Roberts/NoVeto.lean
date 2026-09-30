@@ -1,5 +1,7 @@
-import Roberts.SMon
-import Mathlib.Algebra.Order.BigOperators.Group.Finset
+module
+
+public import Roberts.SMon
+public import Mathlib.Algebra.Order.BigOperators.Group.Finset
 
 namespace Roberts
 
@@ -8,17 +10,17 @@ section
 variable {N A : Type*} [Fintype N] [Fintype A] [DecidableEq N] [DecidableEq A]
   [Nonempty N] [Nonempty A]
 
-noncomputable def range (f : Valuation N A → A) (i : N) (vi : A → Real) : Finset A := by
+@[expose] public noncomputable def range (f : Valuation N A → A) (i : N) (vi : A → Real) : Finset A := by
   classical
   exact Finset.univ.filter (fun a => ∃ v : Valuation N A, f (Function.update v i vi) = a)
 
-def HasNoVetoPower (f : Valuation N A → A) (i : N) : Prop :=
+@[expose] public def HasNoVetoPower (f : Valuation N A → A) (i : N) : Prop :=
   ∀ vi : A → Real, range f i vi = Finset.univ
 
-def IsDictatable (R : (A → Real) → Finset A) (a : A) : Prop :=
+@[expose] public def IsDictatable (R : (A → Real) → Finset A) (a : A) : Prop :=
   ∃ vi : A → Real, R vi = {a}
 
-lemma range_nonempty (f : Valuation N A → A) (i : N) (vi : A → Real) :
+public lemma range_nonempty (f : Valuation N A → A) (i : N) (vi : A → Real) :
     (range f i vi).Nonempty := by
   classical
   let v : Valuation N A := fun _ _ => 0
@@ -28,7 +30,7 @@ lemma range_nonempty (f : Valuation N A → A) (i : N) (vi : A → Real) :
   simp only [Finset.mem_filter]
   exact ⟨Finset.mem_univ _, ⟨v, rfl⟩⟩
 
-lemma range_monotone (f : Valuation N A → A) (hsmon : IsSMon f) (i : N)
+public lemma range_monotone (f : Valuation N A → A) (hsmon : IsSMon f) (i : N)
     (vi vi2 : A → Real) (a : A) (ha : a ∈ range f i vi)
     (h : ∀ b, vi2 a - vi2 b ≥ vi a - vi b) : a ∈ range f i vi2 := by
   classical
@@ -48,7 +50,7 @@ lemma range_monotone (f : Valuation N A → A) (hsmon : IsSMon f) (i : N)
   have hweak := h b
   linarith
 
-lemma range_iia (f : Valuation N A → A) (hsmon : IsSMon f) (i : N)
+public lemma range_iia (f : Valuation N A → A) (hsmon : IsSMon f) (i : N)
     (vi vi2 : A → Real) (a : A) (h : ∀ b, vi a - vi b = vi2 a - vi2 b) :
     (a ∈ range f i vi ↔ a ∈ range f i vi2) := by
   constructor
@@ -57,10 +59,10 @@ lemma range_iia (f : Valuation N A → A) (hsmon : IsSMon f) (i : N)
   · intro ha
     exact range_monotone f hsmon i vi2 vi a ha (fun b => le_of_eq (h b).symm)
 
-def boost (vi : A → Real) (a : A) (d : Real) : A → Real :=
+@[expose] public def boost (vi : A → Real) (a : A) (d : Real) : A → Real :=
   fun b => vi b + (if b = a then d else 0)
 
-lemma range_boost_subset (f : Valuation N A → A) (hsmon : IsSMon f) (i : N)
+public lemma range_boost_subset (f : Valuation N A → A) (hsmon : IsSMon f) (i : N)
     (vi : A → Real) (a : A) (d : Real) (hd : 0 < d) :
     range f i (boost vi a d) ⊆ range f i vi ∪ {a} := by
   classical
@@ -84,7 +86,7 @@ lemma range_boost_subset (f : Valuation N A → A) (hsmon : IsSMon f) (i : N)
     · have hs' : vi x - vi y > vi x - vi y := by
         simpa [boost, hxa, hya] using hs
       linarith
-lemma range_boost_subset_of_mem (f : Valuation N A → A) (hsmon : IsSMon f)
+public lemma range_boost_subset_of_mem (f : Valuation N A → A) (hsmon : IsSMon f)
     (i : N) (vi : A → Real) (a : A) (ha : a ∈ range f i vi)
     (d : Real) (hd : 0 < d) :
     range f i (boost vi a d) ⊆ range f i vi := by
@@ -96,7 +98,7 @@ lemma range_boost_subset_of_mem (f : Valuation N A → A) (hsmon : IsSMon f)
   · subst x
     exact ha
 
-lemma mem_range_boost (f : Valuation N A → A) (hsmon : IsSMon f)
+public lemma mem_range_boost (f : Valuation N A → A) (hsmon : IsSMon f)
     (honto : Function.Surjective f) (i : N) (vi : A → Real) (a : A) :
     ∃ D : Real, ∀ d : Real, D < d → a ∈ range f i (boost vi a d) := by
   classical
@@ -128,10 +130,10 @@ lemma mem_range_boost (f : Valuation N A → A) (hsmon : IsSMon f)
     dsimp [D] at hd
     linarith
 
-def replaceProfile (v w : Valuation N A) (s : Finset N) : Valuation N A :=
+@[expose] public def replaceProfile (v w : Valuation N A) (s : Finset N) : Valuation N A :=
   fun j => if j ∈ s then w j else v j
 
-lemma replaceProfile_insert (v w : Valuation N A) (s : Finset N) (j : N)
+public lemma replaceProfile_insert (v w : Valuation N A) (s : Finset N) (j : N)
     (hj : j ∉ s) :
     replaceProfile v w (insert j s) =
       Function.update (replaceProfile v w s) j (w j) := by
@@ -142,7 +144,7 @@ lemma replaceProfile_insert (v w : Valuation N A) (s : Finset N) (j : N)
   · rw [Function.update_of_ne hkj]
     simp [replaceProfile, hkj]
 
-lemma replaceProfile_erase (v w : Valuation N A) (i : N)
+public lemma replaceProfile_erase (v w : Valuation N A) (i : N)
     (hvi : v i = w i) :
     replaceProfile v w (Finset.univ.erase i) = w := by
   funext j
@@ -151,7 +153,7 @@ lemma replaceProfile_erase (v w : Valuation N A) (i : N)
     simp [replaceProfile, hvi]
   · simp [replaceProfile, hji]
 
-lemma smon_update_preserves (f : Valuation N A → A) (hsmon : IsSMon f)
+public lemma smon_update_preserves (f : Valuation N A → A) (hsmon : IsSMon f)
     (v : Valuation N A) (i : N) (vi2 : A → Real) (a : A)
     (ha : f v = a)
     (hgap : ∀ b, vi2 a - vi2 b ≥ (v i) a - (v i) b) :
@@ -169,7 +171,7 @@ lemma smon_update_preserves (f : Valuation N A → A) (hsmon : IsSMon f)
   have hweak := hgap b
   linarith
 
-lemma smon_update_preserves_avoiding (f : Valuation N A → A)
+public lemma smon_update_preserves_avoiding (f : Valuation N A → A)
     (hsmon : IsSMon f) (v : Valuation N A) (i : N)
     (vi2 : A → Real) (winner excluded : A)
     (hwin : f v = winner)
@@ -193,7 +195,7 @@ lemma smon_update_preserves_avoiding (f : Valuation N A → A)
   have hweak := hgap b hbe
   linarith
 
-lemma smon_replace_preserves (f : Valuation N A → A)
+public lemma smon_replace_preserves (f : Valuation N A → A)
     (hsmon : IsSMon f) (i : N) (v w : Valuation N A) (a : A)
     (hvi : v i = w i)
     (hgap : ∀ j, j ≠ i → ∀ b, w j a - w j b ≥ v j a - v j b)
@@ -229,7 +231,7 @@ lemma smon_replace_preserves (f : Valuation N A → A)
   rw [replaceProfile_erase v w i hvi] at hfinal
   exact hfinal
 
-lemma smon_replace_preserves_avoiding (f : Valuation N A → A)
+public lemma smon_replace_preserves_avoiding (f : Valuation N A → A)
     (hsmon : IsSMon f) (i : N) (v w : Valuation N A) (winner excluded : A)
     (hvi : v i = w i)
     (hnever : ∀ p : Valuation N A, p i = v i → f p ≠ excluded)
@@ -277,7 +279,7 @@ lemma smon_replace_preserves_avoiding (f : Valuation N A → A)
   rw [replaceProfile_erase v w i hvi] at hfinal
   exact hfinal
 
-lemma range_pair_iia (f : Valuation N A → A) (hsmon : IsSMon f)
+public lemma range_pair_iia (f : Valuation N A → A) (hsmon : IsSMon f)
     (i : N) (vi vi2 : A → Real) (a b : A)
     (hgap : vi a - vi b = vi2 a - vi2 b)
     (hb : b ∈ range f i vi) (ha2 : a ∈ range f i vi2) :
@@ -379,7 +381,7 @@ lemma range_pair_iia (f : Valuation N A → A) (hsmon : IsSMon f)
   have hstrict' := hsmon i (fun _ => u) vi vi2 b a hba fwb fwa
   linarith
 
-lemma range_boost_preserves_of_nondictatable (f : Valuation N A → A)
+public lemma range_boost_preserves_of_nondictatable (f : Valuation N A → A)
     (hsmon : IsSMon f) (i : N) (vi : A → Real) (a c : A)
     (hnd : ¬ IsDictatable (range f i) a) (hc : c ∈ range f i vi)
     (hca : c ≠ a) (d : Real)
@@ -417,7 +419,7 @@ lemma range_boost_preserves_of_nondictatable (f : Valuation N A → A)
       simp [vi2, boost, hba, hca]
     exact range_pair_iia f hsmon i vi vi2 b c hgap hc hb2
 
-lemma range_transfer_of_gap (f : Valuation N A → A) (hsmon : IsSMon f)
+public lemma range_transfer_of_gap (f : Valuation N A → A) (hsmon : IsSMon f)
     (i : N) (a b : A) (hab : a ≠ b)
     (hnd : ¬ IsDictatable (range f i) a)
     (v w : A → Real) (ha : a ∈ range f i v) (hb : b ∈ range f i v)
@@ -449,7 +451,7 @@ lemma range_transfer_of_gap (f : Valuation N A → A) (hsmon : IsSMon f)
       _ = w a - w b := by rw [hddef]; linarith
   exact range_pair_iia f hsmon i vd w a b hgapD hbD haW
 
-lemma range_boost_full_of_nondictatable (f : Valuation N A → A)
+public lemma range_boost_full_of_nondictatable (f : Valuation N A → A)
     (hsmon : IsSMon f) (honto : Function.Surjective f) (i : N)
     (a : A) (hnd : ¬ IsDictatable (range f i) a) (vi : A → Real) :
     ∃ d : Real, 0 < d ∧ range f i (boost vi a d) = Finset.univ := by
@@ -531,7 +533,7 @@ lemma range_boost_full_of_nondictatable (f : Valuation N A → A)
     rw [hdd]; linarith
   exact ⟨delta, hdelta_pos, hfull⟩
 
-lemma no_veto_of_nondictatable (f : Valuation N A → A) (hsmon : IsSMon f)
+public lemma no_veto_of_nondictatable (f : Valuation N A → A) (hsmon : IsSMon f)
     (honto : Function.Surjective f) (i : N)
     (h : ∀ a : A, ¬ IsDictatable (range f i) a) : HasNoVetoPower f i := by
   classical
@@ -551,7 +553,7 @@ lemma no_veto_of_nondictatable (f : Valuation N A → A) (hsmon : IsSMon f)
   · subst x
     exact ha
 
-lemma at_most_one_all_dictatable (f : Valuation N A → A) (hsmon : IsSMon f)
+public lemma at_most_one_all_dictatable (f : Valuation N A → A) (hsmon : IsSMon f)
     (honto : Function.Surjective f) (hA : 3 ≤ Fintype.card A)
     (i j : N) (hij : i ≠ j)
     (hi : ∀ a : A, IsDictatable (range f i) a)
@@ -597,7 +599,7 @@ lemma at_most_one_all_dictatable (f : Valuation N A → A) (hsmon : IsSMon f)
     exact Finset.mem_singleton.mp hmem_j
   exact hab (hfa.symm.trans hfb)
 
-theorem all_but_one_no_veto (f : Valuation N A → A) (hsmon : IsSMon f)
+public theorem all_but_one_no_veto (f : Valuation N A → A) (hsmon : IsSMon f)
     (honto : Function.Surjective f) (hA : 3 ≤ Fintype.card A) :
     ∃ i₀ : N, ∀ i, i ≠ i₀ → HasNoVetoPower f i := by
   classical

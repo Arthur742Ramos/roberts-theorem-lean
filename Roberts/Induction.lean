@@ -1,6 +1,8 @@
-import Roberts.TwoAgent
-import Mathlib.Algebra.BigOperators.Ring.Finset
-import Mathlib.Analysis.Real.Sqrt
+module
+
+public import Roberts.TwoAgent
+public import Mathlib.Algebra.BigOperators.Ring.Finset
+public import Mathlib.Analysis.Real.Sqrt
 
 namespace Roberts
 
@@ -177,7 +179,7 @@ private lemma halfspace_homog (u u' : N → Real) (hne : u' ≠ 0)
 
 /-- The choice function with agent i₀'s valuation fixed at vi₀. Used to state
     the per-slice affine representations in the n ≥ 3 induction step. -/
-def slice (f : Valuation N A → A) (i₀ : N) (vi₀ : A → Real) : Valuation N A → A :=
+@[expose] public def slice (f : Valuation N A → A) (i₀ : N) (vi₀ : A → Real) : Valuation N A → A :=
   fun v => f (Function.update v i₀ vi₀)
 
 private lemma weight_pos_of_hnd
@@ -612,7 +614,7 @@ private lemma weights_eq_upper
     agent's valuation. If all agents other than i₀ have no veto power and f is S-MON,
     then for any choice of per-slice affine representations, the weights of agents
     i ≠ i₀ are independent of i₀'s fixed valuation. -/
-lemma weights_independent_of_fixed_agent
+public lemma weights_independent_of_fixed_agent
     (f : Valuation N A → A) (hsmon : IsSMon f)
     (i₀ : N) (hveto : ∀ i, i ≠ i₀ → HasNoVetoPower f i)
     (hA : 3 ≤ Fintype.card A)
@@ -1080,7 +1082,7 @@ private lemma offsets_consistent_of_fixed_agent_core
 /-- Lemma 10 (Dobzinski-Nisan, offset consistency), with its original
     no-veto hypotheses. The proof only needs the affine slice representations,
     their weight independence, and a positive weight away from the fixed agent. -/
-lemma offsets_consistent_of_fixed_agent
+public lemma offsets_consistent_of_fixed_agent
     (f : Valuation N A → A) (hsmon : IsSMon f)
     (i₀ : N) (hveto : ∀ i, i ≠ i₀ → HasNoVetoPower f i)
     (hA : 3 ≤ Fintype.card A)
@@ -1102,7 +1104,7 @@ lemma offsets_consistent_of_fixed_agent
     With a single agent, DSIC forces the choice function to maximize the agent's
     valuation (up to an irrelevant additive constant), i.e., an affine maximizer
     with positive weight on the sole agent. -/
-lemma single_agent_affine_maximizer (M : Mechanism N A) (hdsic : IsDSIC M)
+public lemma single_agent_affine_maximizer (M : Mechanism N A) (hdsic : IsDSIC M)
     (hsmon : IsSMon M.choiceFn) (honto : Function.Surjective M.choiceFn)
     (h1 : Fintype.card N = 1) :
     IsAffineMaximizer M.choiceFn := by
@@ -1180,7 +1182,7 @@ lemma single_agent_affine_maximizer (M : Mechanism N A) (hdsic : IsDSIC M)
     - n = 2 is Lemma 8 (via Lemma 4 to find the no-veto agent).
     - n ≥ 3 is the induction step: fix the possibly-veto agent's valuation,
       apply the IH to the slices, and assemble with Lemmas 9 and 10. -/
-theorem dsic_smon_affine_aux (n : ℕ) :
+public theorem dsic_smon_affine_aux (n : ℕ) :
     ∀ (N : Type*) [Fintype N] [Nonempty N] [DecidableEq N] (M : Mechanism N A),
     IsDSIC M → IsSMon M.choiceFn → Function.Surjective M.choiceFn →
     3 ≤ Fintype.card A → Fintype.card N ≤ n → IsAffineMaximizer M.choiceFn := by
@@ -1711,7 +1713,7 @@ private lemma affineScore_perturb_other (weights : N → Real) (k : A → Real)
 
 /-- Main induction theorem (Dobzinski-Nisan, Lemmas 8-10): a DSIC mechanism whose
     choice function is S-MON and onto, with |A| ≥ 3, is an affine maximizer. -/
-theorem dsic_smon_affine_maximizer (M : Mechanism N A) (hdsic : IsDSIC M)
+public theorem dsic_smon_affine_maximizer (M : Mechanism N A) (hdsic : IsDSIC M)
     (hsmon : IsSMon M.choiceFn) (honto : Function.Surjective M.choiceFn)
     (hA : 3 ≤ Fintype.card A) :
     IsAffineMaximizer M.choiceFn :=
@@ -1722,7 +1724,7 @@ theorem dsic_smon_affine_maximizer (M : Mechanism N A) (hdsic : IsDSIC M)
     tieBreak f hwmon v lie in tieSet f v; the affine-maximizer property is about
     argmax membership, and tie-breaking does not move the outcome out of the
     affine-score argmax. -/
-lemma affine_maximizer_transfer (f : Valuation N A → A) (hwmon : IsWMon f)
+public lemma affine_maximizer_transfer (f : Valuation N A → A) (hwmon : IsWMon f)
     (h : IsAffineMaximizer (tieBreak f hwmon)) : IsAffineMaximizer f := by
   classical
   rcases h with ⟨weights, k, hnonneg, hnonzero, hmax⟩
@@ -1818,7 +1820,7 @@ lemma affine_maximizer_transfer (f : Valuation N A → A) (hwmon : IsWMon f)
 
 /-- Onto preservation: tie-breaking an onto choice function keeps it onto.
     Every alternative in the range of f remains achievable after tie-breaking. -/
-lemma tieBreak_onto (f : Valuation N A → A) (hwmon : IsWMon f)
+public lemma tieBreak_onto (f : Valuation N A → A) (hwmon : IsWMon f)
     (honto : Function.Surjective f) :
     Function.Surjective (tieBreak f hwmon) := by
   intro a
@@ -1842,7 +1844,7 @@ lemma tieBreak_onto (f : Valuation N A → A) (hwmon : IsWMon f)
     agent's value, creating a profitable deviation. The payments must be
     constructed fresh from the tie-broken choice function's own W-MON
     structure, not inherited from the original mechanism. -/
-lemma wmon_dsic_payments (f : Valuation N A → A) (hwmon : IsWMon f) :
+public lemma wmon_dsic_payments (f : Valuation N A → A) (hwmon : IsWMon f) :
     ∃ pay : Valuation N A → N → Real, IsDSIC ⟨f, pay⟩ := by
   classical
   let zeroVal : A → Real := fun _ => 0
@@ -2010,7 +2012,7 @@ lemma wmon_dsic_payments (f : Valuation N A → A) (hwmon : IsWMon f) :
   linarith [hmenuMax (v i) vi2]
 
 /-- Roberts' theorem (M6 assembly): DSIC + onto implies affine maximizer. -/
-theorem roberts_theorem (hA : 3 ≤ Fintype.card A)
+public theorem roberts_theorem (hA : 3 ≤ Fintype.card A)
     (M : Mechanism N A)
     (hdsic : IsDSIC M)
     (honto : Function.Surjective M.choiceFn) :

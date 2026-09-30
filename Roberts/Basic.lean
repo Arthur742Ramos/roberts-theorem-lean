@@ -1,2 +1,4 @@
+module
+
 -- Roberts theorem: full development, culminating in Roberts.roberts_theorem.
-import Roberts.Induction
+public import Roberts.Induction

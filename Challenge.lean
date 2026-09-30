@@ -1,7 +1,10 @@
-import Mathlib.Data.Fintype.Basic
-import Mathlib.Data.Fintype.Card
-import Mathlib.Basic.Real.Basic
+module
 
+public import Mathlib.Data.Fintype.Basic
+public import Mathlib.Data.Fintype.Card
+public import Mathlib.Basic.Real.Basic
+
+public section
 /-!
 # Roberts theorem statements
 
@@ -32,7 +35,7 @@ def IsAffineMaximizer {N A : Type*} [Fintype N] [Fintype A]
 /-- Roberts theorem: with at least three alternatives, every onto
 dominant-strategy incentive compatible choice function is an affine
 maximizer. -/
-theorem roberts_theorem {N A : Type*} [Fintype N] [Fintype A]
+public theorem roberts_theorem {N A : Type*} [Fintype N] [Fintype A]
     [DecidableEq N] [DecidableEq A] [Nonempty N] [Nonempty A]
     (hA : 3 ≤ Fintype.card A)
     (M : Mechanism N A)

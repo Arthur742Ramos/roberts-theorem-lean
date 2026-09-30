@@ -1,5 +1,7 @@
-import Roberts.Defs
-import Mathlib.Tactic.Linarith
+module
+
+public import Roberts.Defs
+public import Mathlib.Tactic.Linarith
 
 namespace Roberts
 
@@ -7,10 +9,10 @@ section
 
 variable {N A : Type*} [Fintype N] [Fintype A] [DecidableEq N] [DecidableEq A]
 
-def Achievable (f : Valuation N A → A) (i : N) (v : Valuation N A) (a : A) : Prop :=
+@[expose] public def Achievable (f : Valuation N A → A) (i : N) (v : Valuation N A) (a : A) : Prop :=
   ∃ vi : A → Real, f (Function.update v i vi) = a
 
-noncomputable def price (M : Mechanism N A) (i : N) (v : Valuation N A) (a : A) : Real :=
+@[expose] public noncomputable def price (M : Mechanism N A) (i : N) (v : Valuation N A) (a : A) : Real :=
   by
     classical
     exact if h : Achievable M.choiceFn i v a then
@@ -19,7 +21,7 @@ noncomputable def price (M : Mechanism N A) (i : N) (v : Valuation N A) (a : A) 
       0
 
 omit [Fintype N] [Fintype A] [DecidableEq A] in
-lemma achievable_update (f : Valuation N A → A) (i : N) (v : Valuation N A)
+public lemma achievable_update (f : Valuation N A → A) (i : N) (v : Valuation N A)
     (vi : A → Real) (a : A) :
     Achievable f i (Function.update v i vi) a ↔ Achievable f i v a := by
   constructor
@@ -29,7 +31,7 @@ lemma achievable_update (f : Valuation N A → A) (i : N) (v : Valuation N A)
     exact ⟨w, by simpa only [Function.update_idem] using hw⟩
 
 omit [DecidableEq A] in
-lemma taxation_payment (M : Mechanism N A) (hdsic : IsDSIC M)
+public lemma taxation_payment (M : Mechanism N A) (hdsic : IsDSIC M)
     (i : N) (v : Valuation N A) (vi1 vi2 : A → Real) (a : A)
     (h1 : M.choiceFn (Function.update v i vi1) = a)
     (h2 : M.choiceFn (Function.update v i vi2) = a) :
@@ -64,7 +66,7 @@ lemma taxation_payment (M : Mechanism N A) (hdsic : IsDSIC M)
     simpa only [Function.update_self, h2, hc21, hp21] using h21
   linarith [h12prime, h21prime]
 
-lemma price_eq_of_mem (M : Mechanism N A) (hdsic : IsDSIC M)
+public lemma price_eq_of_mem (M : Mechanism N A) (hdsic : IsDSIC M)
     (i : N) (v : Valuation N A) (vi : A → Real) (a : A)
     (h : M.choiceFn (Function.update v i vi) = a) :
     M.pay (Function.update v i vi) i = price M i v a := by
@@ -73,7 +75,7 @@ lemma price_eq_of_mem (M : Mechanism N A) (hdsic : IsDSIC M)
   rw [dite_eq_left hex]
   exact taxation_payment M hdsic i v vi hex.choose a h hex.choose_spec
 
-lemma price_independent (M : Mechanism N A) (hdsic : IsDSIC M)
+public lemma price_independent (M : Mechanism N A) (hdsic : IsDSIC M)
     (i : N) (v : Valuation N A)
     (vi vi2 : A → Real) (a : A) :
     price M i (Function.update v i vi) a = price M i (Function.update v i vi2) a := by
@@ -101,7 +103,7 @@ lemma price_independent (M : Mechanism N A) (hdsic : IsDSIC M)
       exact hc ((achievable_update M.choiceFn i v vi2 a).mp h)
     rw [dite_eq_right hleft, dite_eq_right hright]
 
-lemma taxation_ineq (M : Mechanism N A) (hdsic : IsDSIC M)
+public lemma taxation_ineq (M : Mechanism N A) (hdsic : IsDSIC M)
     (i : N) (v : Valuation N A) (vi : A → Real) (a : A)
     (ha : Achievable M.choiceFn i v a) :
     vi (M.choiceFn (Function.update v i vi)) -
@@ -130,13 +132,13 @@ lemma taxation_ineq (M : Mechanism N A) (hdsic : IsDSIC M)
     simpa only [Function.update_self, hchoice, hc, hp] using hdsicAtUpdate
   simpa only [hpStar, hpA] using hfinal
 
-def IsWMon (f : Valuation N A → A) : Prop :=
+@[expose] public def IsWMon (f : Valuation N A → A) : Prop :=
   ∀ i v (vi vi2 : A → Real) (a b : A), a ≠ b →
     f (Function.update v i vi) = a →
     f (Function.update v i vi2) = b →
       vi a - vi b ≥ vi2 a - vi2 b
 
-theorem wmon_of_dsic (M : Mechanism N A) (hdsic : IsDSIC M) : IsWMon M.choiceFn := by
+public theorem wmon_of_dsic (M : Mechanism N A) (hdsic : IsDSIC M) : IsWMon M.choiceFn := by
   intro i v vi vi2 a b hab h1 h2
   have hb : Achievable M.choiceFn i v b := ⟨vi2, h2⟩
   have ha : Achievable M.choiceFn i v a := ⟨vi, h1⟩
